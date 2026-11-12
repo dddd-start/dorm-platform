@@ -1,0 +1,22 @@
+# agent-service 镜像：构建上下文为仓库根目录
+FROM maven:3.9-eclipse-temurin-21 AS build
+WORKDIR /src
+COPY pom.xml ./
+COPY dorm-contract/pom.xml dorm-contract/
+COPY dorm-service/pom.xml dorm-service/
+COPY agent-service/pom.xml agent-service/
+RUN mvn -B -q -pl agent-service -am -DskipTests dependency:go-offline || true
+COPY dorm-contract/src dorm-contract/src
+COPY agent-service/src agent-service/src
+RUN mvn -B -q -pl agent-service -am -DskipTests package
+
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -r -u 10001 appuser
+COPY --from=build /src/agent-service/target/agent-service.jar /app/app.jar
+USER appuser
+EXPOSE 8082
+ENTRYPOINT ["java", "-Dfile.encoding=UTF-8", "-Duser.timezone=Asia/Shanghai", "-jar", "/app/app.jar"]

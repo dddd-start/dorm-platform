@@ -1,0 +1,64 @@
+# 持续集成：后端单元测试 + 前端类型检查与构建
+#
+# 这套单测刻意设计成「零外部依赖」：不需要 MySQL / Redis，也不需要大模型 API Key，
+# 所以在 GitHub 托管的 runner 上直接跑 mvn test 就能通过，工作流里不含任何 secrets。
+# 需要真实数据库的集成测试、Playwright 浏览器冒烟不在本工作流内（见 docs/verification.md）。
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+# 同一分支连推多次时取消上一次未跑完的构建，省 runner 时间
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: backend (JDK 21 · Maven)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 21 (Temurin)
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Run unit tests
+        run: mvn -B -DskipTests=false test
+
+  frontend:
+    name: frontend (Node 24 · Vue 3)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ui-service
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: ui-service/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # build 脚本 = vue-tsc --noEmit && vite build，类型错误会让 CI 失败
+      - name: Type-check and build
+        run: npm run build

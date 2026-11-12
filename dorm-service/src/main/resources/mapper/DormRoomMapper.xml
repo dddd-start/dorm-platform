@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.overseas.dorm.domain.mapper.DormRoomMapper">
+
+    <!--
+      房源可用性检索。
+
+      设计要点（这是全系统最容易写错的一段 SQL）：
+        1. 「可订」的定义必须与**写路径**一致，而不是"看起来更合理"的那个。
+           写路径是 ApplyService.approve → DormBedMapper.occupyBed
+           （`WHERE id = ? AND status = 'IDLE'`），它只看床位**此刻**的状态，
+           与申请日期无关。因此 available_beds ≡ 此刻 IDLE 床位数。
+           曾经这里按「日期区间不重叠」判断（听起来更聪明），结果是：
+           宣称可订的房在审批时被 3005 拒绝（实测 76 vs 59）——
+           读路径承诺了写路径兑现不了的事，用户点下去必然失败（H9）。
+           日期维度的信息保留在 bookable_beds 字段里，明确标注"仅作提示"。
+        2. 用相关子查询而不是 GROUP BY + HAVING：
+           MySQL 下 HAVING 不分组时会把整个结果集当成一组，语义是错的；
+           而 GROUP BY 又会与 ONLY_FULL_GROUP_BY 打架。外层套一层派生表最稳。
+        3. 重命名派生表列时统一用 snake_case，交给 map-underscore-to-camel-case 映射。
+    -->
+    <select id="selectAvailability" resultType="com.overseas.dorm.domain.dto.RoomAvailabilityRow">
+        SELECT * FROM (
+            SELECT
+                r.id              AS room_id,
+                r.building_id     AS building_id,
+                b.name            AS building_name,
+                b.code            AS building_code,
+                r.region_id       AS region_id,
+                rg.name           AS region_name,
+                b.city            AS city,
+                b.address         AS address,
+                r.room_no         AS room_no,
+                r.floor_no        AS floor_no,
+                r.room_type       AS room_type,
+                r.capacity        AS capacity,
+                r.gender_limit    AS gender_limit,
+                r.status          AS status,
+                r.price_per_night AS price_per_night,
+                r.currency        AS currency,
+                r.facilities      AS facilities,
+                r.remark          AS remark,
+                (SELECT COUNT(*) FROM dorm_bed bd
+                  WHERE bd.room_id = r.id AND bd.status = 'IDLE') AS idle_beds,
+                <!--
+                  【H8/H9 修复】available_beds 的定义必须与写路径**逐字等价**。
+
+                  写路径是 ApplyService.approve → DormBedMapper.occupyBed，
+                  它的条件是 `WHERE id = ? AND status = 'IDLE'` —— 也就是说：
+                  一张床能不能被分配，只看它**此刻**是不是 IDLE，与申请日期无关。
+
+                  旧实现（H8/H9 的缺口）：
+                    · 不传日期时，NOT EXISTS 整段被 <if> 丢掉 → available_beds 退化成
+                      "非 DISABLED 计数"，把**此刻已占用**的床也算进"可订"
+                      （实测 sumAvailable=76 vs sumIdle=60，差 16 恰为全部 OCCUPIED 床）；
+                    · 传日期时，按"日期区间是否重叠"判定 → 与写路径不等价
+                      （实测 76 vs 59，差 17 张：宣称可订、审批时 3005）。
+                  两种情形都是"读口径说了写路径兑现不了的话"，前端据此放行按钮，
+                  用户点下去必然失败。
+
+                  现在 available_beds ≡ 此刻 IDLE 床位数（= idle_beds），
+                  因此「查询说可订」⟺「approve 能真的分配成功」，不再依赖日期分支。
+                -->
+                (SELECT COUNT(*) FROM dorm_bed bd
+                  WHERE bd.room_id = r.id AND bd.status = 'IDLE') AS available_beds,
+                <!--
+                  bookable_beds：**时间维度**上不冲突的床位数（旧 available_beds 的语义）。
+                  它回答"下个月会不会有房"，但**不承诺此刻可分配** ——
+                  一张现在被占用、对方下个月退房的床属于这里。
+                  之所以保留成独立字段而不是丢掉：这是真实存在的信息
+                  （前端可以显示「届时预计释放 N 张床」），
+                  只是不能再拿它当"可订"的判据。
+                -->
+                (SELECT COUNT(*) FROM dorm_bed bd2
+                  WHERE bd2.room_id = r.id AND bd2.status &lt;&gt; 'DISABLED'
+                  <if test="checkIn != null and checkOut != null">
+                    AND NOT EXISTS (
+                        SELECT 1 FROM stay_apply a
+                         WHERE a.bed_id = bd2.id
+                           AND a.status IN ('APPROVED', 'CHECKED_IN')
+                           AND a.check_in_date &lt; #{checkOut}
+                           AND #{checkIn} &lt; a.check_out_date
+                    )
+                  </if>
+                ) AS bookable_beds,
+                (SELECT COUNT(*) FROM dorm_bed bd3
+                  WHERE bd3.room_id = r.id AND bd3.status &lt;&gt; 'DISABLED') AS total_beds
+            FROM dorm_room r
+            JOIN dorm_building b ON b.id = r.building_id
+            JOIN region rg ON rg.id = r.region_id
+            WHERE r.status = 'OPEN'
+              AND b.status = 1
+              AND rg.status = 1
+              <if test="regionId != null">
+                AND r.region_id = #{regionId}
+              </if>
+              <if test="buildingId != null">
+                AND r.building_id = #{buildingId}
+              </if>
+              <if test="city != null and city != ''">
+                AND (b.city LIKE CONCAT('%', #{city}, '%') OR b.name LIKE CONCAT('%', #{city}, '%'))
+              </if>
+              <if test="roomType != null and roomType != ''">
+                AND r.room_type = #{roomType}
+              </if>
+              <if test="gender != null and gender != '' and gender != 'ANY'">
+                AND (r.gender_limit = 'ANY' OR r.gender_limit = #{gender})
+              </if>
+        ) t
+        WHERE t.available_beds &gt;= #{minBeds}
+        ORDER BY t.region_id, t.building_code, t.floor_no, t.room_no
+    </select>
+
+    <!-- 房间床位明细：把「谁住到什么时候」直接展示出来，而不是只给一个满/不满的结论 -->
+    <select id="selectBedDetails" resultType="com.overseas.dorm.domain.dto.RoomAvailabilityRow$BedDetail">
+        SELECT
+            bd.id        AS bed_id,
+            bd.bed_no    AS bed_no,
+            bd.status    AS status,
+            a.id         AS apply_id,
+            a.apply_no   AS apply_no,
+            a.employee_name AS employee_name,
+            a.check_in_date  AS occupied_check_in,
+            a.check_out_date AS occupied_check_out
+        FROM dorm_bed bd
+        LEFT JOIN stay_apply a
+               ON a.bed_id = bd.id AND a.status IN ('APPROVED', 'CHECKED_IN')
+        WHERE bd.room_id = #{roomId}
+        ORDER BY bd.bed_no
+    </select>
+
+    <!-- 区域房源总览（管理看板）：房间数 / 床位数 / 空闲床位数 / 入住率 -->
+    <!--
+        统计类查询说明（两处刻意的质量约束）：
+
+        1) resultType 用具体的 VO 而不是 java.util.Map。
+           用 Map 接聚合结果时，列别名拼错不会报错，只会得到 null，
+           再被上层 toInt(null) 变成 0 —— 统计数字静默错误且无人察觉。
+           用具体类型接，字段名对不上在联调阶段就能发现。
+
+        2) 状态值不再在 SQL 里写字符串字面量，而是用 <bind> 引用 Java 枚举。
+           项目里房间/床位状态已经由 RoomStatus、BedStatus 两个枚举定义，
+           如果 SQL 里再写一遍 'OPEN'、'IDLE'，就等于有了第二份真相：
+           哪天枚举改名，编译能过、SQL 照跑，但统计结果会全部变成 0。
+    -->
+    <select id="statisticsByRegion" resultType="com.overseas.dorm.domain.vo.RoomStatsVO">
+        <bind name="S_OPEN" value="@com.overseas.dorm.common.enums.RoomStatus@OPEN.name()"/>
+        <bind name="S_CLOSED" value="@com.overseas.dorm.common.enums.RoomStatus@CLOSED.name()"/>
+        <bind name="S_MAINTENANCE" value="@com.overseas.dorm.common.enums.RoomStatus@MAINTENANCE.name()"/>
+        <bind name="S_IDLE" value="@com.overseas.dorm.common.enums.BedStatus@IDLE.name()"/>
+        <bind name="S_OCCUPIED" value="@com.overseas.dorm.common.enums.BedStatus@OCCUPIED.name()"/>
+        <bind name="S_DISABLED" value="@com.overseas.dorm.common.enums.BedStatus@DISABLED.name()"/>
+        SELECT
+            r.region_id            AS regionId,
+            rg.name                AS regionName,
+            COUNT(DISTINCT r.id)   AS roomCount,
+            <!-- 注意：这里 JOIN 了床位，直接 SUM(r.status=OPEN) 会按床位数放大（一房两床算两次），
+                 必须用 COUNT(DISTINCT ...)，否则会出现"开放房间数 > 房间总数"的统计 bug。 -->
+            COUNT(DISTINCT CASE WHEN r.status = #{S_OPEN} THEN r.id END)        AS openRoomCount,
+            COUNT(DISTINCT CASE WHEN r.status = #{S_CLOSED} THEN r.id END)      AS closedRoomCount,
+            COUNT(DISTINCT CASE WHEN r.status = #{S_MAINTENANCE} THEN r.id END) AS maintenanceRoomCount,
+            COUNT(bd.id)                                                 AS bedCount,
+            SUM(CASE WHEN bd.status = #{S_IDLE} THEN 1 ELSE 0 END)       AS idleBedCount,
+            SUM(CASE WHEN bd.status = #{S_OCCUPIED} THEN 1 ELSE 0 END)   AS occupiedBedCount,
+            SUM(CASE WHEN bd.status = #{S_DISABLED} THEN 1 ELSE 0 END)   AS disabledBedCount
+        FROM dorm_room r
+        JOIN region rg ON rg.id = r.region_id
+        LEFT JOIN dorm_bed bd ON bd.room_id = r.id
+        WHERE (#{regionId} IS NULL OR r.region_id = #{regionId})
+        GROUP BY r.region_id, rg.name
+        ORDER BY r.region_id
+    </select>
+
+    <!--
+        公寓维度的房源统计。
+        这里刻意用一次分组聚合取代"逐栋楼再查一次空闲床位"的写法（N+1）：
+        一页 10 栋楼从 11 次查询降到 1 次，且楼层/床位数量增长时不会变慢。
+    -->
+    <select id="statisticsByBuilding" resultType="com.overseas.dorm.domain.vo.BuildingStatsVO">
+        <bind name="S_IDLE" value="@com.overseas.dorm.common.enums.BedStatus@IDLE.name()"/>
+        SELECT
+            r.building_id                                        AS buildingId,
+            COUNT(DISTINCT r.id)                                 AS roomCount,
+            COUNT(bd.id)                                         AS bedCount,
+            SUM(CASE WHEN bd.status = #{S_IDLE} THEN 1 ELSE 0 END) AS idleBedCount
+        FROM dorm_room r
+        LEFT JOIN dorm_bed bd ON bd.room_id = r.id
+        WHERE (#{regionId} IS NULL OR r.region_id = #{regionId})
+        GROUP BY r.building_id
+    </select>
+</mapper>

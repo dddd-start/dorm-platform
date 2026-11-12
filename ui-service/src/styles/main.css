@@ -1,0 +1,524 @@
+:root {
+  /* 旧变量保留为**别名**，指向新的设计令牌：
+     组件里已有的 var(--dorm-*) 用法无需一次性改完，
+     但取值统一由令牌决定 —— 这样深色主题对旧代码也自动生效。 */
+  --dorm-bg: var(--d-surface-page);
+  --dorm-sidebar-bg: var(--d-sidebar-bg);
+  /* 指向"填充用"品牌色：原先指向 --d-brand(#2f7cf6)，
+     白字落在它上面只有 3.94，不满足 WCAG AA；--d-brand-solid(#1f66d6) 可达 5.34。
+     这条是布局里 :deep(.el-menu-item.is-active) 的取值来源，
+     改别名即可让所有侧栏激活态一起达标（对比度用例守门）。 */
+  --dorm-sidebar-active: var(--d-brand-solid);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+    Arial, sans-serif;
+  background: var(--d-surface-page);
+  color: var(--d-text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 页面通用容器 */
+.page-container {
+  padding: var(--d-space-4);
+}
+
+.page-card {
+  background: var(--d-surface-card);
+  border-radius: var(--d-radius-md);
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: var(--d-shadow-sm);
+}
+
+.page-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.pager {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.muted {
+  color: #909399;
+  font-size: 12px;
+}
+
+.mono {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 12px;
+}
+
+/* JSON 对比展示 */
+.json-block {
+  background: #fafafa;
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 10px;
+  max-height: 380px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* 统计卡片 */
+.stat-card {
+  border-radius: 6px;
+  padding: 18px;
+  color: #fff;
+  height: 100%;
+}
+
+.stat-card .stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.stat-card .stat-label {
+  font-size: 13px;
+  opacity: 0.9;
+  margin-top: 6px;
+}
+
+/* 房源卡片 */
+.room-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.room-card .room-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.room-card .room-no {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.room-card .price {
+  color: #f56c6c;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.room-card .room-meta {
+  color: #606266;
+  font-size: 13px;
+  margin: 2px 0;
+}
+
+.empty-block {
+  padding: 40px 0;
+  text-align: center;
+  color: #909399;
+}
+
+/* AI 助手聊天气泡 */
+.chat-scroll {
+  height: 100%;
+  overflow-y: auto;
+  padding: 16px 20px;
+}
+
+.bubble-row {
+  display: flex;
+  margin-bottom: 18px;
+}
+
+.bubble-row.user {
+  justify-content: flex-end;
+}
+
+.bubble {
+  max-width: 78%;
+  border-radius: 10px;
+  padding: 10px 14px;
+  line-height: 1.7;
+  font-size: 14px;
+  word-break: break-word;
+}
+
+.bubble.user {
+  background: #409eff;
+  color: #fff;
+  border-bottom-right-radius: 2px;
+  white-space: pre-wrap;
+}
+
+.bubble.assistant {
+  background: #fff;
+  border: 1px solid #ebeef5;
+  border-bottom-left-radius: 2px;
+  width: 100%;
+  max-width: 100%;
+}
+
+.bubble .answer {
+  white-space: pre-wrap;
+}
+
+.thinking-box {
+  background: #f7f8fa;
+  border-left: 3px solid #c0c4cc;
+  border-radius: 4px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: #606266;
+  white-space: pre-wrap;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.tool-card {
+  border: 1px solid #e4e7ed;
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fafcff;
+}
+
+.tool-card.failed {
+  border-color: #fbc4c4;
+  background: #fef0f0;
+  color: #f56c6c;
+}
+
+.tool-card.done {
+  border-color: #c2e7b0;
+  background: #f0f9eb;
+  color: #529b2e;
+}
+
+.ref-block {
+  margin-top: 10px;
+  border-top: 1px dashed #e4e7ed;
+  padding-top: 8px;
+}
+
+.ref-item {
+  font-size: 12px;
+  color: #606266;
+  background: #f7f8fa;
+  border-radius: 4px;
+  padding: 6px 8px;
+  margin-bottom: 6px;
+}
+
+.bubble-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid #f0f2f5;
+  font-size: 12px;
+  color: #909399;
+}
+
+.cursor-blink::after {
+  content: '▍';
+  animation: blink 1s steps(2, start) infinite;
+  color: #409eff;
+}
+
+@keyframes blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+.reconnect-tip {
+  margin-bottom: 8px;
+}
+
+/* 主题切换按钮：用令牌取值，深浅色下都自动正确 */
+.theme-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--d-radius-md);
+  color: var(--d-text-secondary);
+  cursor: pointer;
+  transition: background-color var(--d-duration-fast) var(--d-ease-standard),
+    color var(--d-duration-fast) var(--d-ease-standard);
+}
+
+.theme-btn:hover {
+  background: var(--d-surface-sunken);
+  color: var(--d-text-primary);
+}
+
+/* ============================================================================
+ * 移动端卡片列表（宽表在小屏的替代形态）
+ *
+ * 为什么宽表在小屏不该继续当表格用：实测 390px 视口下，订单表内部宽度 1300px、
+ * 审计表 1365px，而可视容器只有 326px —— 用户一屏只能看到 1~2 列，
+ * 且操作列若设了 fixed="right"（审批页宽 290px）会直接吃掉 89% 的可见宽度。
+ * 表格的价值是"跨行比较"，在小屏上这个价值已经不存在了，改卡片更合适。
+ * 卡片保留**同一份数据**，只是把"列"换成"标签 + 值"的行。
+ * ========================================================================= */
+.m-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--d-space-3);
+}
+
+.m-card {
+  --el-card-padding: var(--d-space-3);
+}
+
+.m-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--d-space-2);
+  margin-bottom: var(--d-space-2);
+}
+
+.m-card__title {
+  font-weight: var(--d-font-weight-semibold);
+  font-size: var(--d-font-size-md);
+  color: var(--d-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.m-card__rows {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--d-space-1) var(--d-space-3);
+  font-size: var(--d-font-size-sm);
+}
+
+.m-card__label {
+  color: var(--d-text-tertiary);
+  white-space: nowrap;
+}
+
+.m-card__value {
+  color: var(--d-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.m-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--d-space-1);
+  margin-top: var(--d-space-3);
+  padding-top: var(--d-space-2);
+  border-top: var(--d-border-width) solid var(--d-border-subtle);
+}
+
+/* 横向滚动容器的提示条：只在窄屏显示。
+   表格仍保留（审计/审批这类数据以"跨行比较"为主，转卡片会丢信息），
+   但要明确告诉用户"右边还有内容" —— 否则用户以为列就这些。 */
+.scroll-hint {
+  display: none;
+  align-items: center;
+  gap: var(--d-space-1);
+  margin-bottom: var(--d-space-2);
+  font-size: var(--d-font-size-xs);
+  color: var(--d-text-tertiary);
+}
+
+/* ============================================================================
+ * 页面级响应式（窄屏）
+ *
+ * 断点取值 = 令牌层的 --d-breakpoint-md（768px）。CSS 媒体查询无法读 CSS 变量，
+ * 因此这里只能写字面量 —— 测试里有一条断言专门校验"JS 读到的令牌值"
+ * 与"CSS 生效的断点"一致（本仓库 768px 断点由 useBreakpoint 与 media query 共同约束），
+ * 防止两边漂移。其余三档断点（640/1024/1280）由 useBreakpoint 在 JS 侧读取。
+ * ========================================================================= */
+@media (max-width: 768px) {
+  .page-container {
+    padding: var(--d-space-2);
+  }
+
+  .page-card {
+    padding: var(--d-space-3);
+    margin-bottom: var(--d-space-3);
+  }
+
+  .page-title {
+    font-size: var(--d-font-size-lg);
+    flex-wrap: wrap;
+    gap: var(--d-space-2);
+  }
+
+  /* 弹窗全屏化。
+     实测改造前：区域/用户/公寓弹窗宽 640/620px，比 390px 视口多出 230~250px；
+     审批分房弹窗宽 1100px，右侧 710px 完全在屏幕外（确认按钮点不到）。
+     EP 把宽度写成内联 CSS 变量 --el-dialog-width，用类规则直接覆盖 width 即可。 */
+  .el-dialog {
+    width: auto !important;
+    margin: var(--d-space-2) auto !important;
+  }
+
+  .el-dialog__body {
+    padding: var(--d-space-3) var(--d-space-4);
+    max-height: 68vh;
+    overflow-y: auto;
+  }
+
+  /* 抽屉同理。EP 抽屉用的是**内联 width**（实测 820px，left=-430 —— 一半内容在屏幕外），
+     内联样式只能靠 !important 覆盖。 */
+  .el-drawer {
+    width: 100% !important;
+  }
+
+  .el-drawer__body {
+    padding: var(--d-space-3);
+  }
+
+  /* 表单改单列：标签上移。
+     实测改造前：label-width=100px 时标签右边缘 x=116，输入框从 x=116 才开始，
+     390px 屏上输入区只剩 ~210px。标签上移后输入区可用宽度接近整行。 */
+  .el-form-item {
+    display: block;
+  }
+
+  .el-form-item__label {
+    width: auto !important;
+    justify-content: flex-start;
+    text-align: left;
+    padding: 0 0 var(--d-space-1);
+    line-height: var(--d-line-normal);
+  }
+
+  .el-form-item__content {
+    margin-left: 0 !important;
+  }
+
+  .scroll-hint {
+    display: flex;
+  }
+
+  /* 标签页（Agent 运营看板有 6 个页签）：
+     实测 390px 下 .el-tabs__nav 宽 584px、右边缘 x=636，整排出到屏幕外，
+     且 EP 默认的 .el-tabs__nav-wrap{overflow:hidden} 把它裁掉又没给滚动条 ——
+     用户看不到后面的页签，也滚不到。改为可横向滚动。 */
+  .el-tabs__nav-wrap {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+  }
+
+  .el-tabs__nav-wrap::after {
+    /* 滚动条出现时下划线会被遮挡，隐藏 EP 的底部分隔线装饰 */
+    display: none;
+  }
+}
+
+/* ============================================================================
+ * Element Plus 填充场景的品牌色（对比度审计的修复）
+ *
+ * 实测：白字落在 --el-color-primary 默认值 #409eff 上对比度仅 2.78，
+ * 落在我们的 --d-brand #2f7cf6 上 3.94 —— 都不到 WCAG AA 要求的 4.5:1。
+ * 因此**填充类**组件（主按钮、激活菜单项、实心标签）改用更深的 --d-brand-solid。
+ * 描边/文字类（plain 按钮、链接）仍用 --d-brand，避免整体发暗。
+ * ========================================================================= */
+.el-button--primary:not(.is-plain):not(.is-text):not(.is-link) {
+  --el-button-bg-color: var(--d-brand-solid);
+  --el-button-border-color: var(--d-brand-solid);
+  --el-button-hover-bg-color: var(--d-brand-hover);
+  --el-button-hover-border-color: var(--d-brand-hover);
+  --el-button-active-bg-color: var(--d-brand-active);
+  --el-button-active-border-color: var(--d-brand-active);
+}
+
+.el-menu-item.is-active {
+  background-color: var(--d-brand-solid) !important;
+}
+
+/* ============================================================================
+ * Element Plus plain 标签的文字色（对比度审计的修复）
+ *
+ * 实测：浅色主题下 .el-tag（success/plain）的文字色是 EP 的亮绿 #67c23a，
+ * 落在白底上对比度只有 2.24，远低于 AA 的 4.5:1。
+ * EP 的 plain 标签把"主色"直接当文字色用 —— 主色为了醒目而偏亮，
+ * 用作**文字**却不够暗。这里给各语义色的 plain 标签换成对应的深色文字令牌。
+ * ========================================================================= */
+
+
+
+
+
+/* ============================================================================
+ * Element Plus plain 标签的文字色（对比度审计的修复 —— 第二轮才修对）
+ *
+ * 踩坑记录：我前三轮分别写了
+ *   ① .el-tag--success.is-plain     ② .el-tag.el-tag--success.is-plain
+ *   ③ 覆盖 --el-tag-text-color !important
+ * 全部无效。最后用**开发者工具级别**的诊断（枚举命中元素的样式表规则）才查出真因：
+ *   **EP 用的类名是 `el-tag--plain`，根本没有 `is-plain` 这个类** ——
+ *   我的选择器一个都没命中，与特异性、!important 毫无关系。
+ *
+ * 教训：连续三次"修了没用"时，应当**立刻停止改样式、先去确认选择器是否命中**。
+ * 我多花了两轮才做这件事。
+ *
+ * EP 的实际链路：`.el-tag.el-tag--success { --el-tag-text-color: var(--el-color-success) }`
+ * → 文字用的是"主色"，而主色为了醒目偏亮，用作**文字**达不到 AA 4.5:1。
+ * 因此这里按类型覆盖为对应的深色文字令牌（3 个类 > EP 的 2 个类，特异性足够）。
+ * ========================================================================= */
+.el-tag.el-tag--success.el-tag--plain {
+  --el-tag-text-color: var(--d-success-text);
+  --el-tag-border-color: var(--d-success);
+}
+
+.el-tag.el-tag--warning.el-tag--plain {
+  --el-tag-text-color: var(--d-warning-text);
+  --el-tag-border-color: var(--d-warning);
+}
+
+.el-tag.el-tag--danger.el-tag--plain {
+  --el-tag-text-color: var(--d-danger-text);
+  --el-tag-border-color: var(--d-danger);
+}
+
+.el-tag.el-tag--info.el-tag--plain {
+  --el-tag-text-color: var(--d-info-text);
+  --el-tag-border-color: var(--d-info);
+}

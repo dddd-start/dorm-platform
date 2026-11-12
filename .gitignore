@@ -1,0 +1,45 @@
+# ===== 构建产物 =====
+target/
+dist/
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
+
+# ===== 前端依赖 =====
+node_modules/
+npm-debug.log*
+pnpm-debug.log*
+yarn-error.log*
+
+# ===== 本地运行时（二进制、数据、日志、pid）=====
+env/
+data/
+logs/
+run/
+
+# ===== 凭据 =====
+config/.env
+config/.env.*
+!config/.env.example
+**/application-local.yml
+*.pem
+*.key
+*.p12
+*.jks
+keystore
+deploy/.env
+
+# ===== IDE / OS =====
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# ===== 测试与临时 =====
+test-results/
+playwright-report/
+*.log
+tmp/
+
+# ===== 本地工作目录（改造过程产物，不提交）=====
+.work/

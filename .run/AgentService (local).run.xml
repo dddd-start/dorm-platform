@@ -1,0 +1,12 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="AgentService (local)" type="Application" factoryName="Application">
+    <option name="MAIN_CLASS_NAME" value="com.overseas.dorm.agent.AgentServiceApplication" />
+    <module name="agent-service" />
+    <envs>
+      <env name="SPRING_PROFILES_ACTIVE" value="local" />
+    </envs>
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

@@ -1,0 +1,173 @@
+spring:
+  application:
+    name: agent-service
+  threads:
+    virtual:
+      enabled: ${DORM_VIRTUAL_THREADS:true}
+
+  # Agent 独占库：会话、消息、工具审计、用量、记忆、RAG。
+  # 业务库不在此配置中 —— 业务数据一律通过 HTTP 调用 dorm-service。
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${DORM_AGENT_DB_URL:jdbc:mysql://127.0.0.1:3307/agent_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true&useServerPrepStmts=true}
+    username: ${DORM_AGENT_DB_USER:agent}
+    password: ${DORM_AGENT_DB_PASSWORD:}
+    hikari:
+      pool-name: agentHikari
+      minimum-idle: 4
+      maximum-pool-size: ${DORM_AGENT_DB_POOL_SIZE:40}
+      connection-timeout: 8000
+      idle-timeout: 300000
+      max-lifetime: 1500000
+      connection-test-query: SELECT 1
+
+  data:
+    redis:
+      host: ${DORM_REDIS_HOST:127.0.0.1}
+      port: ${DORM_REDIS_PORT:6380}
+      password: ${DORM_REDIS_PASSWORD:}
+      database: 0
+      timeout: 3000ms
+      connect-timeout: 3000ms
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+    validate-on-migrate: true
+    clean-disabled: true
+    table: flyway_schema_history
+
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+
+  mvc:
+    async:
+      request-timeout: 180s
+
+server:
+  port: ${DORM_AGENT_PORT:8082}
+  address: 0.0.0.0
+  shutdown: graceful
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  tomcat:
+    threads:
+      max: 400
+      min-spare: 20
+    max-connections: 20000
+    accept-count: 2000
+    connection-timeout: 20s
+    keep-alive-timeout: 60s
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  type-aliases-package: com.overseas.dorm.domain.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    cache-enabled: false
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+  global-config:
+    banner: false
+    db-config:
+      id-type: assign_id
+      insert-strategy: not_null
+      update-strategy: not_null
+      where-strategy: not_null
+
+dorm:
+  service:
+    # 业务服务地址（服务间调用）
+    url: ${DORM_SERVICE_URL:http://127.0.0.1:8081}
+    timeout-seconds: ${DORM_SERVICE_TIMEOUT:10}
+  internal:
+    # 与 dorm-service 共享的服务间令牌
+    token: ${DORM_INTERNAL_TOKEN:dev-internal-token}
+  security:
+    jwt:
+      issuer: overseas-dorm
+      secret: ${DORM_JWT_SECRET:dorm-dev-secret-please-override-in-production-0123456789}
+
+  agent:
+    enabled: ${DORM_AGENT_ENABLED:true}
+    provider:
+      base-url: ${DORM_AI_BASE_URL:https://api.commandcode.ai/provider/v1}
+      api-key: ${DORM_AI_API_KEY:}
+      timeout-seconds: 120
+      max-retries: 1
+      log-requests: false
+      log-responses: false
+    model:
+      primary: ${DORM_AI_MODEL_PRIMARY:deepseek/deepseek-v4.1-flash}
+      fast: ${DORM_AI_MODEL_FAST:deepseek/deepseek-v4.1-flash-fast}
+      # 降级链：主模型 403/超时/限流时按顺序换模型，避免整轮对话失败
+      fallback:
+        - deepseek/deepseek-v4-flash
+        - deepseek/deepseek-v4.1-flash-fast
+      temperature: 0.2
+      max-tokens: 2048
+      max-tool-invocations: 6
+      max-tool-round-trips: 3
+      turn-timeout-seconds: 90
+      max-concurrent-calls: ${DORM_MODEL_MAX_CONCURRENCY:16}
+    archive:
+      enabled: ${DORM_AGENT_ARCHIVE_ENABLED:true}
+      retention-days: 30
+      cron: "0 15 3 * * ?"
+    mock:
+      enabled: ${DORM_AGENT_MOCK:false}
+      chunk-size: 6
+      delay-ms: 15
+    memory:
+      window-size: 20
+      summarize-after-turns: 12
+      max-long-term-items: 20
+    stream:
+      heartbeat-seconds: 15
+      channel-queue-capacity: ${DORM_STREAM_QUEUE_CAPACITY:512}
+      channel-idle-timeout-seconds: ${DORM_STREAM_IDLE_TIMEOUT:90}
+      buffer-max-length: ${DORM_STREAM_BUFFER_MAX:1000}
+      buffer-ttl-seconds: 1800
+      max-streams-per-user: 3
+      max-streams-global: ${DORM_MAX_STREAMS_GLOBAL:1000}
+      generation-timeout-seconds: 120
+    ratelimit:
+      turns-per-minute: 20
+      burst: 5
+      daily-token-budget: 0
+    guardrail:
+      enabled: true
+      stream-window-size: 60
+      block-on-hit: true
+    rag:
+      enabled: true
+      top-k: 5
+      min-score: 0.55
+      chunk-size: 400
+      chunk-overlap: 60
+      embedding-cache-ttl-seconds: 86400
+      retrieval-cache-ttl-seconds: 300
+      rebuild-on-startup: true
+
+logging:
+  level:
+    root: INFO
+    com.overseas.dorm: ${DORM_LOG_LEVEL:INFO}
+    dev.langchain4j: INFO
+    org.springframework.web: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId:-}] %logger{36} - %msg%n"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized

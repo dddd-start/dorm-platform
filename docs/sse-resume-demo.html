@@ -1,0 +1,967 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SSE 断点重连 · 单步拆解</title>
+<style>
+  :root{
+    --bg:#050810; --panel:rgba(10,17,32,.84); --panel-2:rgba(7,13,25,.96);
+    --line:rgba(148,163,184,.16); --text:#e8effb; --muted:#93a6c0; --dim:#5f738e;
+    --cyan:#38bdf8; --teal:#2dd4bf; --violet:#a78bfa; --amber:#fbbf24;
+    --green:#34d399; --rose:#fb7185;
+    --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    --mono: "SFMono-Regular", "Cascadia Code", "JetBrains Mono", Consolas, "Liberation Mono", monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%}
+  body{
+    background:var(--bg); color:var(--text); font-family:var(--font);
+    -webkit-font-smoothing:antialiased; overflow-x:hidden;
+  }
+  body::before{
+    content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
+    background:
+      radial-gradient(850px 500px at 16% -10%, rgba(56,189,248,.15), transparent 62%),
+      radial-gradient(720px 460px at 88% 0%, rgba(167,139,250,.12), transparent 62%),
+      radial-gradient(700px 500px at 50% 110%, rgba(45,212,191,.08), transparent 60%);
+  }
+  body::after{
+    content:""; position:fixed; inset:0; z-index:0; pointer-events:none; opacity:.3;
+    background-image:linear-gradient(rgba(148,163,184,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(148,163,184,.045) 1px,transparent 1px);
+    background-size:42px 42px;
+    mask-image:radial-gradient(ellipse at 50% 26%, #000 22%, transparent 78%);
+  }
+  .shell{position:relative; z-index:1; width:min(1500px, calc(100% - 52px)); margin:0 auto; padding:20px 0 92px}
+  .topbar{display:flex; justify-content:space-between; align-items:flex-end; gap:24px; margin-bottom:14px}
+  .eyebrow{display:flex; align-items:center; gap:8px; color:var(--muted); font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; font-weight:650}
+  .eyebrow i{width:6px;height:6px;border-radius:99px;background:var(--green);box-shadow:0 0 0 4px rgba(52,211,153,.1),0 0 14px rgba(52,211,153,.8)}
+  h1{margin:8px 0 5px; font-size:clamp(30px,3.2vw,44px); line-height:1.1; letter-spacing:-.045em; font-weight:760}
+  h1 span{background:linear-gradient(92deg,#67e8f9,#93c5fd 50%,#c4b5fd);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{margin:0;max-width:780px;color:#a7b9cf;font-size:14px;line-height:1.75}
+  .step-now{display:flex;align-items:center;gap:10px;padding-bottom:3px;white-space:nowrap}
+  .counter{font-family:var(--mono);font-size:14px;color:#dbe7f7;letter-spacing:.03em}
+  .counter small{color:#566a84}
+  .mini-tag{font-family:var(--mono);font-size:9.5px;color:#7dd3fc;border:1px solid rgba(56,189,248,.22);background:rgba(56,189,248,.06);border-radius:99px;padding:4px 7px}
+  .scene{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(400px,.92fr);gap:13px;align-items:stretch;height:calc(100vh - 225px);min-height:680px;max-height:790px}
+  .stage-panel,.detail{height:100%;overflow:auto;scrollbar-width:thin;scrollbar-color:#263850 transparent;scroll-padding-bottom:76px}
+  .stage-panel{padding-bottom:76px}
+  .detail{padding-right:3px;padding-bottom:76px}
+  .stage-panel::-webkit-scrollbar,.detail::-webkit-scrollbar{width:5px}
+  .stage-panel::-webkit-scrollbar-thumb,.detail::-webkit-scrollbar-thumb{background:#263850;border-radius:9px}
+  .panel{
+    background:linear-gradient(160deg,rgba(15,23,42,.88),rgba(6,11,22,.96));
+    border:1px solid var(--line); border-radius:17px;
+    box-shadow:0 22px 70px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.03);
+    backdrop-filter:blur(14px);
+  }
+  .stage-panel{padding:13px;display:flex;flex-direction:column;min-width:0}
+  .stage-top{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:0 3px 9px}
+  .stage-title{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;color:#9db0c8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .stage-title b{color:#7dd3fc;font-weight:550}
+  .stage-top .hint{font-family:var(--mono);font-size:10px;color:#53677f;white-space:nowrap}
+  .actors{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;position:relative;z-index:3}
+  .actor{
+    display:flex;align-items:center;gap:9px;min-width:0;padding:9px 10px;border-radius:12px;
+    border:1px solid rgba(148,163,184,.18);
+    background:linear-gradient(145deg,rgba(23,37,61,.94),rgba(9,17,31,.96));
+    box-shadow:0 10px 24px rgba(0,0,0,.22),inset 0 1px 0 rgba(255,255,255,.04);
+  }
+  .actor-icon{width:33px;height:33px;flex:0 0 33px;border-radius:10px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.1);background:rgba(56,189,248,.1);color:#7dd3fc}
+  .actor-icon svg{width:18px;height:18px;display:block}
+  .actor[data-actor="agent"] .actor-icon{background:rgba(45,212,191,.1);color:#5eead4}
+  .actor[data-actor="redis"] .actor-icon{background:rgba(251,191,36,.1);color:#fcd34d}
+  .actor-name{font-size:14px;font-weight:700;letter-spacing:-.01em}
+  .actor-sub{font-size:11px;color:#71849e;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .status{margin-left:auto;flex:0 0 auto;font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;padding:3px 6px;border-radius:99px;border:1px solid rgba(52,211,153,.27);background:rgba(52,211,153,.08);color:#6ee7b7}
+  .status.warn{border-color:rgba(251,191,36,.3);background:rgba(251,191,36,.08);color:#fde68a}
+  .status.bad{border-color:rgba(251,113,133,.3);background:rgba(251,113,133,.08);color:#fda4af}
+  .status.idle{border-color:rgba(148,163,184,.2);background:rgba(148,163,184,.06);color:#9fb0c8}
+  .status.run{border-color:rgba(56,189,248,.28);background:rgba(56,189,248,.08);color:#7dd3fc}
+  .actor-readout{display:flex;justify-content:space-between;gap:6px;margin-top:7px;padding-top:7px;border-top:1px solid rgba(148,163,184,.1);font-family:var(--mono);font-size:10px;color:#6f839d;min-width:0}
+  .actor-readout span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .actor-readout b{color:#c4d3e6;font-weight:550}
+  .wire{
+    position:relative;height:270px;margin-top:8px;border-radius:12px;overflow:hidden;
+    border:1px solid rgba(148,163,184,.13);
+    background:
+      radial-gradient(ellipse at 50% -20%,rgba(56,189,248,.09),transparent 60%),
+      linear-gradient(180deg,rgba(8,15,29,.72),rgba(4,9,18,.88));
+  }
+  .wire-caption{position:absolute;left:10px;top:9px;z-index:4;padding:3px 7px;border-radius:5px;border:1px solid rgba(148,163,184,.14);background:rgba(4,10,20,.82);color:#9fc2da;font-family:var(--mono);font-size:8.5px;letter-spacing:.02em;max-width:calc(100% - 20px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .wire-grid{position:absolute;inset:0;pointer-events:none;opacity:.55;background-image:linear-gradient(rgba(148,163,184,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(148,163,184,.04) 1px,transparent 1px);background-size:28px 28px;mask-image:radial-gradient(ellipse at 50% 30%,#000 22%,transparent 82%)}
+  .wire::before,.wire::after{content:"";position:absolute;top:0;bottom:0;border-left:1px dashed rgba(148,163,184,.13)}
+  .wire::before{left:33.333%}.wire::after{left:66.666%}
+  .rail{position:absolute;left:7%;right:7%;border-top:1px dashed rgba(148,163,184,.12)}
+  .rail span{position:absolute;left:50%;top:-8px;transform:translateX(-50%);padding:0 7px;background:#08101f;color:#5d718b;font-family:var(--mono);font-size:9px;letter-spacing:.08em;white-space:nowrap}
+  .rail.r1{top:25%}.rail.r2{top:52%}.rail.r3{top:78%}
+  .packet-layer{position:absolute;inset:0;z-index:5;pointer-events:none;overflow:hidden}
+  .packet{position:absolute;height:7px;min-width:7px;border-radius:99px;background:var(--cyan);box-shadow:0 0 0 3px rgba(56,189,248,.1),0 0 14px rgba(56,189,248,.65);will-change:transform,opacity}
+  .packet::after{content:"";position:absolute;right:-2px;top:50%;width:4px;height:4px;transform:translateY(-50%) rotate(45deg);border-top:1px solid currentColor;border-right:1px solid currentColor;color:inherit}
+  .packet.amber{background:var(--amber);box-shadow:0 0 0 3px rgba(251,191,36,.1),0 0 14px rgba(251,191,36,.55);color:#fbbf24}
+  .packet.violet{background:var(--violet);box-shadow:0 0 0 3px rgba(167,139,250,.1),0 0 14px rgba(167,139,250,.55);color:#a78bfa}
+  .packet.green{background:var(--green);box-shadow:0 0 0 3px rgba(52,211,153,.1),0 0 14px rgba(52,211,153,.55);color:#34d399}
+  .packet.rose{background:var(--rose);box-shadow:0 0 0 3px rgba(251,113,133,.1),0 0 14px rgba(251,113,133,.55);color:#fb7185}
+  .packet.duplicate{background:transparent;border:1px dashed rgba(251,113,133,.8);box-shadow:none;height:0;width:38px;color:#fb7185}
+  .packet.duplicate::after{display:none}
+  .packet-label{position:absolute;bottom:9px;left:50%;transform:translateX(-50%);padding:2px 6px;border-radius:4px;border:1px solid rgba(148,163,184,.16);background:rgba(4,10,20,.95);color:#d4e2f4;font-family:var(--mono);font-size:10px;white-space:nowrap;letter-spacing:.01em;box-shadow:0 5px 14px rgba(0,0,0,.25)}
+  .fault{
+    position:absolute;left:50%;top:50%;z-index:7;transform:translate(-50%,-50%) scale(.92);
+    display:flex;align-items:center;gap:7px;padding:7px 10px;border-radius:8px;border:1px solid rgba(251,113,133,.38);
+    background:rgba(45,12,26,.9);color:#fecdd3;font-size:10px;font-weight:650;white-space:nowrap;
+    opacity:0;pointer-events:none;transition:.25s ease;box-shadow:0 0 0 6px rgba(251,113,133,.06),0 12px 32px rgba(0,0,0,.35)
+  }
+  .fault.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  .fault small{font-family:var(--mono);font-size:7.5px;font-weight:400;color:#fda4af;opacity:.78}
+  .runtime{border:1px solid rgba(148,163,184,.13);border-radius:11px;background:rgba(3,8,18,.5);padding:8px 9px 7px;margin-top:8px}
+  .runtime-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:5px}
+  .runtime-head span:first-child{font-family:var(--mono);font-size:8.5px;letter-spacing:.12em;color:#5f7895;text-transform:uppercase}
+  .runtime-head span:last-child{font-family:var(--mono);font-size:8px;color:#6f839d}
+  .threads{display:flex;flex-wrap:wrap;gap:4px;min-height:20px}
+  .thread-chip{display:flex;align-items:center;gap:4px;padding:3px 5px;border:1px solid rgba(148,163,184,.13);border-radius:5px;background:rgba(10,18,32,.7);opacity:.45;transition:.25s ease;white-space:nowrap}
+  .thread-chip .tc{display:grid;place-items:center;min-width:21px;height:15px;padding:0 2px;border-radius:3px;font-family:var(--mono);font-size:7.5px;color:#93a6c0;background:rgba(148,163,184,.1);border:1px solid rgba(148,163,184,.16)}
+  .thread-chip b{font-family:var(--mono);font-size:9.5px;font-weight:550;color:#a9b9cd}
+  .thread-chip small{font-family:var(--mono);font-size:8px;color:#5e738d}
+  .thread-chip.run{opacity:1;border-color:rgba(56,189,248,.35);background:rgba(56,189,248,.07)}
+  .thread-chip.run .tc{color:#7dd3fc;border-color:rgba(56,189,248,.3);background:rgba(56,189,248,.1)}
+  .thread-chip.run b{color:#d9eafb}
+  .thread-chip.wait{opacity:1;border-color:rgba(251,191,36,.32);background:rgba(251,191,36,.055)}
+  .thread-chip.wait .tc{color:#fde68a;border-color:rgba(251,191,36,.3);background:rgba(251,191,36,.08)}
+  .thread-chip.closed{opacity:.5;border-style:dashed}
+  .queues{display:grid;grid-template-columns:1.18fr .82fr;gap:7px;margin-top:6px}
+  .queue-box{border:1px solid rgba(148,163,184,.12);border-radius:7px;padding:5px 6px;background:rgba(6,13,25,.58);min-width:0}
+  .queue-box.active{border-color:rgba(56,189,248,.3);background:rgba(56,189,248,.035)}
+  .qhead{display:flex;justify-content:space-between;align-items:center;gap:6px;font-family:var(--mono);font-size:9px;color:#88a0b9}
+  .qhead span:last-child{color:#5e738d;font-size:7.2px}
+  .qcells{display:flex;gap:2px;align-items:center;min-height:17px;margin-top:4px}
+  .qcell{width:24px;height:20px;flex:0 0 24px;display:grid;place-items:center;border:1px solid rgba(148,163,184,.16);border-radius:2px;background:rgba(148,163,184,.025);color:#52657f;font-family:var(--mono);font-size:8px}
+  .qcell.filled{border-color:rgba(56,189,248,.4);background:rgba(56,189,248,.14);color:#bae6fd;animation:cellIn .28s ease both}
+  .qcell.more{border-color:transparent;background:transparent;width:auto;flex:0 0 auto;color:#6d829d;font-size:6px}
+  .qfoot{display:flex;justify-content:space-between;gap:5px;margin-top:3px;font-family:var(--mono);font-size:8px;color:#637a94}
+  .qfoot span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .qfoot b{color:#8fc9e8;font-weight:500;flex:0 0 auto}
+  .substeps{margin-top:8px;border:1px solid rgba(148,163,184,.12);border-radius:10px;background:rgba(3,8,18,.42);padding:8px 10px;display:flex;flex-direction:column;flex:1;min-height:120px}
+  .sub-head{display:flex;justify-content:space-between;align-items:center;gap:8px;font-family:var(--mono);font-size:8px;letter-spacing:.1em;color:#6f8aa6;text-transform:uppercase;margin-bottom:4px}
+  .sub-head span:last-child{color:#53677f;letter-spacing:0;font-size:7px}
+  .substeps ol{list-style:none;margin:0;padding:0;counter-reset:sub;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:7px;flex:1;min-height:0}
+  .substeps li{position:relative;counter-increment:sub;display:flex;align-items:flex-start;padding:10px 10px 10px 33px;font-size:12px;line-height:1.6;color:#a9bdd1;border:1px solid rgba(148,163,184,.11);border-radius:8px;background:rgba(148,163,184,.025)}
+  .substeps li:first-child{border:1px solid rgba(148,163,184,.11)}
+  .substeps li::before{content:counter(sub);position:absolute;left:9px;top:11px;width:18px;height:18px;display:grid;place-items:center;border-radius:5px;border:1px solid rgba(56,189,248,.24);background:rgba(56,189,248,.065);color:#7dd3fc;font-family:var(--mono);font-size:8.5px}
+  .substeps li b{color:#dbe9f8;font-weight:600}
+  .browser-strip{margin-top:8px;border:1px solid rgba(148,163,184,.13);border-radius:9px;padding:7px 9px;background:rgba(4,10,20,.52);display:flex;align-items:center;gap:9px;min-width:0}
+  .browser-strip .dot{width:5px;height:5px;border-radius:99px;background:var(--green);box-shadow:0 0 9px rgba(52,211,153,.7);flex:0 0 auto}
+  .browser-strip.offline .dot{background:var(--rose);box-shadow:0 0 9px rgba(251,113,133,.7)}
+  .browser-strip .label{font-family:var(--mono);font-size:9px;color:#7186a0;white-space:nowrap}
+  .browser-strip .text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;color:#c6d5e7;flex:1}
+  .browser-strip .seq{font-family:var(--mono);font-size:10px;color:#7dd3fc;white-space:nowrap}
+  .detail{display:flex;flex-direction:column;gap:10px;min-width:0}
+  .narration{padding:15px 16px 14px;order:1}
+  .message-card{order:2}
+  .security{order:3}
+  .detail.security-first .security{order:2}
+  .detail.security-first .message-card{order:3}
+  .kicker{font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--cyan);text-transform:uppercase}
+  .narration h2{margin:6px 0 7px;font-size:23px;line-height:1.3;letter-spacing:-.025em}
+  .narration p{margin:0;color:#a9bbd0;font-size:13.5px;line-height:1.75}
+  .explain-label{margin-top:10px;font-family:var(--mono);font-size:8px;letter-spacing:.12em;color:#6f8aa6;text-transform:uppercase}
+  .explain{margin:5px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:5px}
+  .explain li{position:relative;padding-left:12px;font-size:13.2px;line-height:1.7;color:#b3c4d7}
+  .explain li::before{content:"";position:absolute;left:0;top:8px;width:4px;height:4px;border-radius:99px;background:#38bdf8;box-shadow:0 0 8px rgba(56,189,248,.55)}
+  .explain code{color:#bae6fd;font-size:.92em}
+  .explain b{color:#e0edf9;font-weight:600}
+  .thread-note{margin-top:10px;padding:8px 9px;border-radius:7px;border:1px solid rgba(56,189,248,.15);background:rgba(56,189,248,.045);color:#a9d1e8;font-family:var(--mono);font-size:10px;line-height:1.65}
+  .thread-note::before{content:"THREADS  ";color:#7dd3fc;font-size:7px;letter-spacing:.1em}
+  .message-card{padding:12px 13px 11px;min-width:0}
+  .card-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+  .card-head h3{margin:0;font-size:12px;color:#cbd8e8;font-weight:650}
+  .card-head span{font-family:var(--mono);font-size:8.5px;color:#627890;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .body{max-height:300px;overflow:auto;margin:0;padding:10px 11px;border:1px solid rgba(148,163,184,.12);border-radius:7px;background:rgba(3,8,18,.62);color:#c3d3e7;font-family:var(--mono);font-size:12.2px;line-height:1.7;white-space:pre-wrap;word-break:break-word;scrollbar-width:thin;scrollbar-color:#263850 transparent}
+  .body::-webkit-scrollbar{width:4px}.body::-webkit-scrollbar-thumb{background:#263850;border-radius:9px}
+  .body .c{color:#627890}.body .k{color:#c4b5fd}.body .s{color:#86efac}.body .n{color:#fcd34d}.body .r{color:#fda4af}
+  .security{padding:11px 12px 10px;border:1px solid rgba(148,163,184,.14)}
+  .security.strict{border-color:rgba(52,211,153,.3);background:linear-gradient(160deg,rgba(7,25,23,.72),rgba(6,13,24,.92))}
+  .security .card-head h3{display:flex;align-items:center;gap:6px}
+  .lock{width:12px;height:12px;display:inline-block;color:#6ee7b7}
+  .security p{margin:5px 0 0;font-size:12.5px;line-height:1.75;color:#a9bece}
+  .security code{color:#bae6fd;font-size:10.5px}
+  .security ul{margin:5px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:3px}
+  .security li{position:relative;padding-left:12px;font-family:var(--mono);font-size:11px;line-height:1.65;color:#a8bdcd}
+  .security li::before{content:"›";position:absolute;left:0;color:#5eead4}
+  .security li b{color:#d3e9df;font-weight:550}
+  .security .badge{display:inline-block;margin-top:7px;font-family:var(--mono);font-size:8.5px;color:#fda4af;border:1px solid rgba(251,113,133,.25);background:rgba(251,113,133,.055);border-radius:4px;padding:3px 5px}
+  .iso{display:grid;gap:4px;margin-top:7px}
+  .iso-row{display:flex;align-items:center;gap:6px;padding:4px 6px;border:1px solid rgba(148,163,184,.12);border-radius:5px;background:rgba(3,8,18,.4);font-family:var(--mono);font-size:9.2px;color:#9fb6c8;min-width:0}
+  .iso-row b{display:grid;place-items:center;width:16px;height:16px;flex:0 0 16px;border-radius:4px;border:1px solid rgba(56,189,248,.25);background:rgba(56,189,248,.07);color:#7dd3fc;font-size:8px;font-weight:600}
+  .iso-row span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .iso-row.block{border-color:rgba(251,113,133,.25);background:rgba(251,113,133,.045);color:#fda4af}
+  .deck{position:fixed;left:50%;transform:translateX(-50%);bottom:12px;z-index:50;width:min(1500px,calc(100% - 52px));display:flex;align-items:center;gap:9px;margin:0;padding:7px 8px;border:1px solid var(--line);border-radius:12px;background:rgba(6,12,23,.93);box-shadow:0 18px 55px rgba(0,0,0,.42);backdrop-filter:blur(16px)}
+  .btn{appearance:none;border:1px solid rgba(148,163,184,.2);background:rgba(15,23,42,.62);color:#c4d3e6;border-radius:7px;height:32px;padding:0 11px;cursor:pointer;font-family:inherit;font-size:11.5px;display:inline-flex;align-items:center;gap:4px;transition:.18s ease;white-space:nowrap}
+  .btn:hover{border-color:rgba(56,189,248,.36);background:rgba(56,189,248,.08);color:#e0f2fe}
+  .btn:disabled{opacity:.3;cursor:not-allowed}
+  .btn.primary{background:rgba(56,189,248,.14);border-color:rgba(56,189,248,.35);color:#e0f2fe}
+  .dots{display:flex;align-items:center;gap:3px;flex:1;justify-content:center;min-width:0}
+  .dot-btn{appearance:none;border:0;background:transparent;padding:4px 5px;cursor:pointer;color:#5e738e;font-family:var(--mono);font-size:9px;border-radius:4px;white-space:nowrap}
+  .dot-btn:hover{background:rgba(148,163,184,.07);color:#c4d3e6}
+  .dot-btn.active{background:rgba(56,189,248,.12);color:#bae6fd}
+  .dot-btn.done{color:#7d9ab8}
+  .deck .sep{width:1px;height:17px;background:rgba(148,163,184,.13)}
+  .deck .hint{font-family:var(--mono);font-size:8px;color:#53677f;white-space:nowrap}
+  @keyframes cellIn{from{opacity:.15;transform:translateY(3px) scale(.92)}to{opacity:1;transform:none}}
+  @keyframes sceneIn{from{opacity:.35;transform:translateY(5px)}to{opacity:1;transform:none}}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+  .scene.enter{animation:sceneIn .28s ease both}
+  @media (max-width:1120px){
+    .scene{grid-template-columns:1fr;height:auto;max-height:none;min-height:0}
+    .stage-panel,.detail{height:auto;overflow:visible}
+    .topbar{flex-direction:column;align-items:flex-start;gap:8px}
+    .detail{display:grid;grid-template-columns:1fr 1fr;align-items:start}
+    .narration{grid-column:1/-1}
+    .security{grid-column:1/-1}
+  }
+  @media (max-width:760px){
+    .shell{width:calc(100% - 22px);padding-top:13px}
+    .actors{gap:5px}.actor{padding:7px;gap:6px}.actor-icon{width:27px;height:27px;flex-basis:27px}.actor-sub{display:none}.actor-name{font-size:9.5px}.status{font-size:6.5px;padding:2px 4px}
+    .actor-readout{font-size:6px;gap:3px}
+    .wire{height:240px}.rail span{font-size:6px}
+    .thread-chip small{display:none}.thread-chip{padding:2px 4px}
+    .queues{grid-template-columns:1fr}.detail{grid-template-columns:1fr}.deck{position:static;transform:none;width:auto;flex-wrap:wrap;margin-top:10px}.dots{justify-content:flex-start}.hint{display:none}
+    .substeps ol{grid-template-columns:1fr;grid-template-rows:none}
+    .shell{padding-bottom:24px}.stage-panel,.detail{padding-bottom:13px}
+    .browser-strip .text{font-size:8.5px}
+  }
+  @media (prefers-reduced-motion: reduce){
+    *,*::before,*::after{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important}
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="topbar">
+    <div>
+      <div class="eyebrow"><i></i> dorm-platform · agent-service · SSE / Redis</div>
+      <h1>断点重连，<span>一步一步看</span></h1>
+      <p class="sub">每一步只保留当前动作：谁在跑、队列里有什么、消息体长什么样、为什么不会串台。用「下一步」推进，不再一次看完整流程。</p>
+    </div>
+    <div class="step-now">
+      <span class="mini-tag">单步模式</span>
+      <span class="counter"><span id="stepNow">01</span><small> / 08</small></span>
+    </div>
+  </header>
+
+  <main class="scene" id="scene">
+    <section class="panel stage-panel">
+      <div class="stage-top">
+        <div class="stage-title" id="stageTitle"><b>01</b> · 建立连接与 START</div>
+        <div class="hint">messageId <span id="midTop">2113…434</span> · 单轮单条流</div>
+      </div>
+
+      <div class="actors">
+        <div class="actor" data-actor="browser">
+          <div class="actor-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 9h18M8 21h8M12 18v3"/></svg></div>
+          <div style="min-width:0"><div class="actor-name">Browser</div><div class="actor-sub">fetch reader</div></div>
+          <span class="status" id="browserBadge">ONLINE</span>
+        </div>
+        <div class="actor" data-actor="agent">
+          <div class="actor-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="16" height="6" rx="1.5"/><rect x="4" y="14" width="16" height="6" rx="1.5"/><path d="M8 7h.01M8 17h.01M12 7h4M12 17h4"/></svg></div>
+          <div style="min-width:0"><div class="actor-name">Agent Service</div><div class="actor-sub">Spring · virtual threads</div></div>
+          <span class="status run" id="agentBadge">GENERATING</span>
+        </div>
+        <div class="actor" data-actor="redis">
+          <div class="actor-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg></div>
+          <div style="min-width:0"><div class="actor-name">Redis</div><div class="actor-sub">Stream + Pub/Sub</div></div>
+          <span class="status warn" id="redisBadge">GENERATING</span>
+        </div>
+      </div>
+
+      <div class="actor-readout">
+        <span>lastSeq <b id="browserSeq">1</b></span>
+        <span>phase <b id="agentPhase">GENERATING</b></span>
+        <span>state <b id="redisState">GENERATING</b> · subs <b id="redisSubs">1</b> · stream <b id="redisCount">1</b></span>
+      </div>
+
+      <div class="wire" id="wire">
+        <div class="wire-grid"></div>
+        <div class="wire-caption" id="wireCaption">POST → START</div>
+        <div class="rail r1"><span>HTTP / SSE</span></div>
+        <div class="rail r2"><span>XADD · PUBLISH · XRANGE · SUBSCRIBE</span></div>
+        <div class="rail r3"><span>replay · dedupe</span></div>
+        <div class="packet-layer" id="packetLayer"></div>
+        <div class="fault" id="fault">⚡ 网络中断 <small>SSE stream closed</small></div>
+      </div>
+
+      <div class="runtime">
+        <div class="runtime-head"><span>JVM / THREADS &amp; QUEUES</span><span>queue 512 · 满 → INTERRUPTED · 定时任务 0/连接</span></div>
+        <div class="threads" id="threads"></div>
+        <div class="queues">
+          <div class="queue-box" id="qBox">
+            <div class="qhead"><span>SseChannel.queue</span><span id="qCap">cap 512</span></div>
+            <div class="qcells" id="qCells"></div>
+            <div class="qfoot"><span id="qNote">offer() → take()</span><b id="qCount">1 / 512</b></div>
+          </div>
+          <div class="queue-box" id="pBox">
+            <div class="qhead"><span>pendingBuffer</span><span>ConcurrentLinkedQueue</span></div>
+            <div class="qcells" id="pCells"></div>
+            <div class="qfoot"><span id="pNote">当前为空</span><b id="pCount">0</b></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="browser-strip" id="browserStrip">
+        <span class="dot"></span>
+        <span class="label" id="browserLabel">浏览器已渲染</span>
+        <span class="text" id="browserText">等待 START…</span>
+        <span class="seq" id="browserSeqLabel">lastSeq = 1</span>
+      </div>
+
+      <section class="substeps">
+        <div class="sub-head"><span>本步执行顺序</span><span>only current step</span></div>
+        <ol id="substeps"></ol>
+      </section>
+    </section>
+
+    <aside class="detail" id="detail">
+      <section class="panel narration">
+        <div class="kicker" id="kicker">01 / 建立连接</div>
+        <h2 id="title">POST 进来，先拿 messageId</h2>
+        <p id="desc"></p>
+        <div class="explain-label">本步详解</div>
+        <ul class="explain" id="explain"></ul>
+        <div class="thread-note" id="threadNote"></div>
+      </section>
+
+      <section class="panel message-card">
+        <div class="card-head"><h3 id="bodyLabel">HTTP 请求 + 第一帧</h3><span id="bodyMeta">request / SSE</span></div>
+        <pre class="body" id="body"></pre>
+      </section>
+
+      <section class="panel security" id="security">
+        <div class="card-head"><h3><svg class="lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg> 隔离与归属</h3><span>security</span></div>
+        <div id="securityBody"></div>
+      </section>
+    </aside>
+  </main>
+
+  <footer class="deck">
+    <button class="btn" id="prev" aria-label="上一步">← 上一步</button>
+    <button class="btn primary" id="next" aria-label="下一步">下一步 →</button>
+    <div class="dots" id="dots"></div>
+    <button class="btn" id="replay">重播本步</button>
+    <button class="btn" id="restart">从头</button>
+    <span class="sep"></span>
+    <span class="hint">← → 切换 · 每一步只显示当前动作</span>
+  </footer>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = (s, r = document) => r.querySelector(s);
+  const STEPS = [
+    {
+      kicker: '01 / 建立连接',
+      title: 'POST 进来，先拿 messageId',
+      desc: 'Tomcat 请求线程创建 messageId，写一条 START；随后把真正的生成交给虚拟线程。请求线程不等模型，浏览器拿到 START 就可以开始收流。',
+      threadNote: 'Tomcat 请求线程：创建 + 返回 emitter；generate VT：接管模型；writer VT：开始等队列。',
+      threads: { request: 'run', generate: 'run', callback: 'idle', writer: 'run', listener: 'idle', heartbeat: 'run', orphan: 'idle' },
+      queue: { items: ['S'], note: 'offer(START) → take()', pending: [], pendingNote: '不是续传，pending 不用' },
+      browser: { conn: 'ONLINE', tone: 'run', lastSeq: 1, status: '等待首个 token', text: '' },
+      agent: { phase: 'GENERATING', tone: 'run' },
+      redis: { state: 'GENERATING', subs: 1, count: 1, tone: 'warn' },
+      packets: [
+        { from: 'browser', to: 'agent', label: 'POST + JWT', color: 'cyan', y: .25, delay: 80 },
+        { from: 'agent', to: 'redis', label: 'XADD START', color: 'amber', y: .55, delay: 500 },
+        { from: 'agent', to: 'redis', label: 'PUBLISH START', color: 'violet', y: .7, delay: 820 },
+        { from: 'agent', to: 'browser', label: 'SSE id:1 START', color: 'green', y: .4, delay: 1160 }
+      ],
+      bodyLabel: 'HTTP 请求 + 第一帧',
+      bodyMeta: 'request / SSE START',
+      body: `<span class="c">POST</span> /api/agent/chat/stream
+<span class="c">Authorization:</span> Bearer &lt;JWT&gt;
+<span class="c">Content-Type:</span> application/json
+
+{<span class="s">"conversationId"</span>: <span class="n">2113179521944457218</span>,
+ <span class="s">"turnId"</span>: <span class="s">"1f3c…"</span>,
+ <span class="s">"message"</span>: <span class="s">"帮我预定一个德国的房间"</span>}
+
+<span class="c">── SSE START ──</span>
+<span class="n">id:1</span>
+<span class="n">event:START</span>
+<span class="n">data:</span>{"messageId":<span class="n">2113179524582674434</span>,
+      "conversationId":<span class="n">2113179521944457218</span>,
+      "turnId":"1f3c…","heartbeatSeconds":15}`,
+      security: `<p>每个 messageId 只属于本轮会话；所有 Redis key、队列、writer 都以它为后缀。</p><ul><li><b>key</b> dorm:stream:{messageId}</li><li><b>queue</b> 本连接私有 SseChannel</li><li><b>writer</b> 每连接一条 VT</li></ul>`
+    },
+    {
+      kicker: '02 / 异步双写',
+      title: '模型回调、队列、writer 是三条线',
+      desc: 'token 回调发生在 LangChain4j 的 ForkJoinPool；generate VT 把每个事件 offer 到有界队列；writer VT 从队列 take 出来再 emitter.send()。生产与写出彻底解耦。',
+      threadNote: 'model callback（ForkJoinPool）→ generate VT → queue.offer() → writer VT → socket；Redis 同时收到 XADD + PUBLISH。',
+      threads: { request: 'idle', generate: 'run', callback: 'run', writer: 'run', listener: 'idle', heartbeat: 'run', orphan: 'idle' },
+      queue: { items: ['2', '3', '4'], note: '待写帧按 seq 排队', pending: [], pendingNote: '不是续传，pending 不用' },
+      browser: { conn: 'ONLINE', tone: 'run', lastSeq: 4, status: '正常消费 DELTA', text: '德国属于欧洲区域（EU）。目前有 2 栋公寓：法兰克福会展公寓、慕尼黑公园公寓。' },
+      agent: { phase: 'GENERATING', tone: 'run' },
+      redis: { state: 'GENERATING', subs: 1, count: 4, tone: 'warn' },
+      packets: [
+        { from: 'agent', to: 'redis', label: 'XADD seq=2..4', color: 'amber', y: .55, delay: 80 },
+        { from: 'agent', to: 'redis', label: 'PUBLISH seq=2..4', color: 'violet', y: .7, delay: 380 },
+        { from: 'agent', to: 'browser', label: 'SSE DELTA ×3', color: 'green', y: .25, delay: 720 }
+      ],
+      bodyLabel: 'Redis 双写 + SSE DELTA',
+      bodyMeta: 'XADD / PUBLISH / SSE',
+      body: `<span class="c">── Redis Stream ──</span>
+XADD dorm:stream:2113179524582674434 *
+  seq 4 event DELTA
+  data {"text":"法兰克福会展公寓、慕尼黑公园公寓。"}
+
+<span class="c">── Pub/Sub ──</span>
+PUBLISH dorm:stream:live:2113179524582674434
+  {"seq":4,"event":"DELTA","data":"{\\"text\\":\\"…\\"}"}
+
+<span class="c">── SSE ──</span>
+<span class="n">id:4</span>
+<span class="n">event:DELTA</span>
+<span class="n">data:</span>{"text":"法兰克福会展公寓、慕尼黑公园公寓。",
+      "messageId":<span class="n">2113179524582674434</span>}`,
+      security: `<p>每次工具调用都带本轮 <code>AgentTokenContext</code> 里的用户 JWT；不会把 A 用户的 token 带给 B 用户。</p><ul><li><b>turn</b> messageId 唯一</li><li><b>token</b> 本轮用户 JWT</li><li><b>queue</b> 本连接私有</li></ul>`
+    },
+    {
+      kicker: '03 / 断线',
+      title: '请求线程早结束了，生成线程还在跑',
+      desc: '浏览器断开只销毁这条连接和它的 writer；generate VT 不受影响，继续把 seq5、seq6 写进 Redis。writer 已经 closed，队列为空，watchdog 开始观察是否有人回来。',
+      threadNote: 'Tomcat 已结束；generate VT 仍在跑；writer closed；orphan watchdog 只判断“还有人接收吗”。',
+      threads: { request: 'idle', generate: 'run', callback: 'run', writer: 'closed', listener: 'idle', heartbeat: 'run', orphan: 'run' },
+      queue: { items: [], note: 'channel closed', pending: [], pendingNote: '断开时没有 pending' },
+      browser: { conn: 'OFFLINE', tone: 'bad', lastSeq: 4, status: '流已断开', text: '德国属于欧洲区域（EU）。目前有 2 栋公寓：法兰克福会展公寓、慕尼黑公园公寓。' },
+      agent: { phase: 'GENERATING', tone: 'warn' },
+      redis: { state: 'GENERATING', subs: 0, count: 6, tone: 'warn' },
+      fault: true,
+      packets: [
+        { from: 'agent', to: 'redis', label: 'XADD seq=5,6', color: 'amber', y: .55, delay: 120 },
+        { from: 'agent', to: 'redis', label: 'PUBLISH seq=5,6', color: 'violet', y: .7, delay: 450 }
+      ],
+      bodyLabel: '断线后只写 Redis',
+      bodyMeta: 'XADD 5 / XADD 6',
+      body: `<span class="c">// 浏览器不再有 socket，但生成继续</span>
+XADD dorm:stream:2113179524582674434 *
+  seq 5 event DELTA data {"text":"入住需要日期、城市和房型，"}
+
+XADD dorm:stream:2113179524582674434 *
+  seq 6 event DELTA data {"text":"把这三项发我就能继续查房。"}
+
+<span class="c">// writer 已 closed；没有 SSE 帧发出</span>
+socket: ✗  (browser offline)`,
+      security: `<p>断线只影响这条连接；<b>不会</b>把本轮数据写进别的用户/别的会话。</p><ul><li><b>key</b> 仍是本 messageId</li><li><b>subs</b> 归零，但 key 还在</li><li><b>watchdog</b> 30s 后才考虑取消</li></ul>`
+    },
+    {
+      kicker: '04 / 重连鉴权',
+      title: '先验 owner，再谈补历史',
+      desc: '浏览器按 1s→2s→4s 退避（上限 10s），带 lastEventId=4 和 JWT 回来。Tomcat 线程只做鉴权：messageId → conversationId → requireOwned(conversationId, userId)。不是 owner 就直接 404，不订阅、不回放。',
+      threadNote: 'Tomcat 请求线程处理 GET；鉴权通过后才创建新的 SseChannel；此时 writer 等待，listener 还没开始。',
+      threads: { request: 'run', generate: 'run', callback: 'idle', writer: 'wait', listener: 'idle', heartbeat: 'run', orphan: 'run' },
+      queue: { items: [], note: '新 channel 等待第一帧', pending: [], pendingNote: '鉴权通过才继续' },
+      browser: { conn: 'RECONNECTING', tone: 'warn', lastSeq: 4, status: '退避 2s → GET resume', text: '德国属于欧洲区域（EU）。目前有 2 栋公寓：法兰克福会展公寓、慕尼黑公园公寓。' },
+      agent: { phase: 'RESUME', tone: 'run' },
+      redis: { state: 'GENERATING', subs: 0, count: 6, tone: 'warn' },
+      strict: true,
+      packets: [
+        { from: 'browser', to: 'agent', label: 'GET ?lastEventId=4', color: 'cyan', y: .25, delay: 100 }
+      ],
+      bodyLabel: '续传请求 + 归属校验',
+      bodyMeta: 'GET / auth',
+      body: `<span class="c">GET</span> /api/agent/chat/stream/2113179524582674434?lastEventId=4
+<span class="c">Authorization:</span> Bearer &lt;JWT&gt;
+
+<span class="c">// AgentTurnService.resume()</span>
+LoginUser user = UserContext.require();
+AgentMessage m = messageMapper.selectById(messageId);
+AgentConversation c = conversationService.requireOwned(
+    m.getConversationId(), user.getUserId());
+<span class="k">if</span> (c == <span class="k">null</span>) {
+    <span class="k">return</span> errorEmitter(AGENT_TURN_NOT_FOUND);
+}`,
+      security: `<p><b>防串台的关键：不是猜不到 messageId，而是归属校验。</b> JWT → <b>userId=9001</b>；messageId → conversationId；<code>requireOwned</code> 失败返回 404，不区分“不存在”和“不是你的”。</p><div class="iso"><div class="iso-row"><b>A</b><span>messageId A · queue A · stream A</span></div><div class="iso-row"><b>B</b><span>messageId B · queue B · stream B</span></div><div class="iso-row block"><b>B</b><span>A 带 B 的 messageId → 404，不订阅 B 的流</span></div></div><span class="badge">校验通过前：不 SUBSCRIBE、不 XRANGE、不创建可读通道</span>`
+    },
+    {
+      kicker: '05 / 先订阅',
+      title: '先挂上实时通道，再读历史',
+      desc: '鉴权通过后，续传连接先 SUBSCRIBE live channel。期间到达的实时事件只进 pendingBuffer，不直接发给浏览器；下一步才去 XRANGE 历史。',
+      threadNote: 'Tomcat 线程完成订阅注册；Pub/Sub listener 开始回调；writer 仍 wait；pendingBuffer 准备接住窗口期事件。',
+      threads: { request: 'idle', generate: 'run', callback: 'idle', writer: 'wait', listener: 'run', heartbeat: 'run', orphan: 'run' },
+      queue: { items: [], note: '订阅完成，等待历史', pending: [], pendingNote: '实时事件到达后进这里' },
+      browser: { conn: 'RESYNC', tone: 'warn', lastSeq: 4, status: '已订阅，等待历史', text: '德国属于欧洲区域（EU）。目前有 2 栋公寓：法兰克福会展公寓、慕尼黑公园公寓。' },
+      agent: { phase: 'RESUME', tone: 'run' },
+      redis: { state: 'GENERATING', subs: 1, count: 6, tone: 'warn' },
+      packets: [
+        { from: 'agent', to: 'redis', label: 'SUBSCRIBE live', color: 'violet', y: .55, delay: 100 },
+        { from: 'redis', to: 'agent', label: 'listener ready', color: 'green', y: .7, delay: 560 }
+      ],
+      bodyLabel: '先订阅实时频道',
+      bodyMeta: 'SUBSCRIBE',
+      body: `<span class="c">// 1) 先订阅</span>
+SUBSCRIBE dorm:stream:live:2113179524582674434
+
+<span class="c">// 2) 回调只进 pendingBuffer</span>
+event -&gt; pendingBuffer.add(event)
+
+<span class="c">// 此时还没有读历史</span>
+XRANGE: (not yet)
+
+<span class="c">// 关键：订阅先于 XRANGE</span>
+<span class="r">先读历史再订阅 → 窗口期事件永久丢失</span>`,
+      security: `<p>只有 owner 校验通过，才会订阅这个 messageId 的 channel。</p><ul><li>channel 名带 messageId</li><li>不同用户 → 不同 channel</li><li>listener 每 messageId 共享 1 份</li><li>不会广播到全局频道</li></ul>`
+    },
+    {
+      kicker: '06 / 补历史',
+      title: 'XRANGE 只补 seq > 4',
+      desc: 'readAfter(messageId, 4, 1000) 读取本 messageId 的 Stream，过滤掉 1–4，得到 5、6。历史帧同样经过 SseChannel 队列和 writer VT，不是直接写 socket。',
+      threadNote: 'generate VT 已收尾；listener 收到 seq7 DONE 放 pending；历史 5、6 进 SseChannel 队列；writer VT 逐条写出。',
+      threads: { request: 'idle', generate: 'run', callback: 'idle', writer: 'run', listener: 'run', heartbeat: 'run', orphan: 'idle' },
+      queue: { items: ['5', '6'], note: '历史 replay 入队', pending: ['7'], pendingNote: 'DONE 在补历史期间到达' },
+      browser: { conn: 'RESYNC', tone: 'warn', lastSeq: 6, status: '已经补齐 seq5–6', text: '德国属于欧洲区域（EU）。目前有 2 栋公寓：法兰克福会展公寓、慕尼黑公园公寓。入住需要日期、城市和房型，把这三项发我就能继续查房。' },
+      agent: { phase: 'RESUME', tone: 'run' },
+      redis: { state: 'DONE', subs: 1, count: 7, tone: 'warn' },
+      packets: [
+        { from: 'redis', to: 'agent', label: 'XRANGE seq>4', color: 'amber', y: .55, delay: 80 },
+        { from: 'agent', to: 'browser', label: 'replay 5,6', color: 'cyan', y: .25, delay: 460 },
+        { from: 'agent', to: 'redis', label: 'XADD DONE 7', color: 'amber', y: .7, delay: 820 },
+        { from: 'agent', to: 'redis', label: 'PUBLISH DONE', color: 'violet', y: .82, delay: 1060 }
+      ],
+      bodyLabel: 'XRANGE 历史 + 补发',
+      bodyMeta: 'XRANGE / replay',
+      body: `<span class="c">// 只读本 messageId 的 Stream</span>
+XRANGE dorm:stream:2113179524582674434 - +
+<span class="c">filter:</span> seq &gt; 4
+<span class="c">→</span> seq 5 DELTA
+<span class="c">→</span> seq 6 DELTA
+
+<span class="c">// 历史帧仍走队列 → writer</span>
+offer(5); offer(6)
+
+<span class="c">── 浏览器补发帧 ──</span>
+<span class="n">id:5</span>
+<span class="n">event:DELTA</span>
+<span class="n">data:</span>{"text":"入住需要日期、城市和房型，"}`,
+      security: `<p>XRANGE 的 key 来自当前 messageId；读不到、也不会读别的用户的 Stream。</p><ul><li><b>key</b> dorm:stream:{messageId}</li><li><b>filter</b> seq &gt; lastEventId</li><li><b>history</b> 本会话私有</li></ul>`
+    },
+    {
+      kicker: '07 / 合流去重',
+      title: 'pending 合流，seq 是唯一裁判',
+      desc: '历史补完后 live=true，把 pendingBuffer 里的 seq7 补发。如果同一 seq 从历史与实时两条路径都到达，writer 的 lastWrittenSeq 和前端的 lastSeq 都会丢弃重复帧。',
+      threadNote: 'listener 已切入 live；writer VT 继续 take；pendingBuffer 清空；每个连接独立去重，不共享 lastSeq。',
+      threads: { request: 'idle', generate: 'run', callback: 'idle', writer: 'run', listener: 'run', heartbeat: 'run', orphan: 'idle' },
+      queue: { items: ['7'], note: 'pending 合流后写出', pending: [], pendingNote: '已全部合流' },
+      browser: { conn: 'ONLINE', tone: 'run', lastSeq: 7, status: '已恢复 · 实时接续', text: '德国属于欧洲区域（EU）。目前有 2 栋公寓：法兰克福会展公寓、慕尼黑公园公寓。入住需要日期、城市和房型，把这三项发我就能继续查房。' },
+      agent: { phase: 'LIVE', tone: 'run' },
+      redis: { state: 'DONE', subs: 1, count: 7, tone: 'warn' },
+      packets: [
+        { from: 'redis', to: 'agent', label: 'pending seq7', color: 'violet', y: .7, delay: 80 },
+        { from: 'agent', to: 'browser', label: 'flush seq7', color: 'green', y: .25, delay: 430 },
+        { from: 'agent', to: 'browser', label: 'dup seq6', color: 'rose', y: .4, delay: 820, duplicate: true }
+      ],
+      bodyLabel: '合流 + 按 seq 去重',
+      bodyMeta: 'pending / dedupe',
+      body: `<span class="c">// pending 合流</span>
+pendingBuffer.poll() → seq 7
+
+<span class="c">// 本连接已写出的最大 seq</span>
+lastWrittenSeq = 6
+offer(7) → 7 &gt; 6  <span class="s">accept</span>
+offer(6) → 6 &lt;= 6 <span class="r">drop duplicate</span>
+
+<span class="c">// 前端同样规则</span>
+if (frame.id &lt;= lastSeq) return`,
+      security: `<p>pendingBuffer 和 SseChannel 都是<b>本连接私有</b>；去重只比较本连接的 lastSeq，不会拿别的用户/别的流的序号。</p><ul><li><b>queue</b> 每个 SseChannel 独立</li><li><b>pending</b> 每次 resume() 新建</li><li><b>lastSeq</b> 每个浏览器独立</li></ul>`
+    },
+    {
+      kicker: '08 / 收口',
+      title: '终态到，线程和队列一起收',
+      desc: 'DONE 已经写入 Stream，state=DONE。续传连接补完历史后关闭；如果之后才重连，只补历史并立即关闭。Stream 保留 30 分钟，支持刷新和换实例。',
+      threadNote: 'generate VT 结束；writer closed；listener 退订；heartbeat 只剩全局 tick；每连接队列释放，Redis 缓冲等 TTL。',
+      threads: { request: 'idle', generate: 'idle', callback: 'idle', writer: 'closed', listener: 'idle', heartbeat: 'idle', orphan: 'idle' },
+      queue: { items: [], note: '队列已释放', pending: [], pendingNote: '已清空' },
+      browser: { conn: 'CLOSED', tone: 'idle', lastSeq: 7, status: 'DONE / 已收口', text: '德国属于欧洲区域（EU）。目前有 2 栋公寓：法兰克福会展公寓、慕尼黑公园公寓。入住需要日期、城市和房型，把这三项发我就能继续查房。' },
+      agent: { phase: 'IDLE', tone: 'idle' },
+      redis: { state: 'DONE', subs: 0, count: 7, tone: 'idle' },
+      packets: [
+        { from: 'agent', to: 'browser', label: 'DONE / close', color: 'green', y: .25, delay: 100 },
+        { from: 'agent', to: 'redis', label: 'state=DONE', color: 'amber', y: .55, delay: 460 }
+      ],
+      bodyLabel: '终态帧 + 状态键',
+      bodyMeta: 'DONE / state',
+      body: `<span class="c">── SSE DONE ──</span>
+<span class="n">id:7</span>
+<span class="n">event:DONE</span>
+<span class="n">data:</span>{"messageId":<span class="n">2113179524582674434</span>,
+      "status":"COMPLETED","graceful":false,
+      "latencyMs":9834,"toolCalls":2}
+
+<span class="c">── Redis state ──</span>
+SET dorm:stream:state:2113179524582674434
+    DONE EX 1800
+
+<span class="c">// 之后才重连：历史 + 终态，立即关闭</span>`,
+      security: `<p>TTL 按 messageId 过期，某个用户的流不会拖住另一个用户；关连接也不会清掉别人的 key。</p><ul><li><b>TTL</b> 1800s / messageId</li><li><b>MAXLEN</b> ~1000 / stream</li><li><b>subs</b> 归零，key 保留</li></ul>`
+    }
+  ];
+
+  const THREAD_DEFS = [
+    { key: 'request', code: 'P', label: 'Tomcat', desc: '请求线程' },
+    { key: 'generate', code: 'VT', label: 'generate', desc: '虚拟线程' },
+    { key: 'callback', code: 'FJ', label: 'model cb', desc: 'ForkJoinPool' },
+    { key: 'writer', code: 'VT', label: 'writer', desc: '每连接 1 条' },
+    { key: 'listener', code: 'L', label: 'Pub/Sub', desc: '共享监听' },
+    { key: 'heartbeat', code: 'T', label: 'heartbeat', desc: '15s tick' },
+    { key: 'orphan', code: 'W', label: 'watchdog', desc: '30s 宽限' }
+  ];
+
+  const SUBSTEPS = [
+    [
+      '<b>Tomcat</b> 接收 POST，校验 JWT',
+      '创建 <b>messageId</b> + assistant 占位',
+      '写 START：<b>XADD → PUBLISH → pushFrame</b>',
+      'writer VT 写出 <b>id:1</b>；请求线程返回'
+    ],
+    [
+      '模型回调进入 <b>ForkJoinPool</b>',
+      'generate VT 恢复 <b>AgentTurnContext</b>',
+      '每帧 <b>XADD → PUBLISH → offer 队列</b>',
+      'writer VT <b>take() → emitter.send()</b>'
+    ],
+    [
+      '浏览器断开，<b>onError → cleanup</b>',
+      '释放 SseChannel / writer / queue',
+      'generate VT 继续写 <b>seq5、6</b>',
+      'watchdog 观察 <b>subscriberCount=0</b>'
+    ],
+    [
+      'GET + JWT + <b>lastEventId=4</b>',
+      'messageId → message → <b>conversationId</b>',
+      '<b>requireOwned(conversationId,userId)</b> → true',
+      '创建新 SseChannel；writer <b>wait</b>'
+    ],
+    [
+      'owner 校验通过',
+      '<b>SUBSCRIBE</b> live:{messageId}',
+      'listener 回调只进 <b>pendingBuffer</b>',
+      '此时还没有 <b>XRANGE</b>'
+    ],
+    [
+      '<b>readAfter(id, 4, 1000)</b>',
+      '过滤 seq &gt; 4，得到 <b>5、6</b>',
+      'offer 5/6 → writer 写回浏览器',
+      '同时 seq7 DONE 进 <b>pending</b>'
+    ],
+    [
+      '历史补完，<b>live=true</b>',
+      '把 pending <b>seq7</b> 补发',
+      '<b>lastWrittenSeq</b> 挡住重复 seq6',
+      '前端 <b>lastSeq</b> 再挡一次'
+    ],
+    [
+      'DONE 写 Stream + <b>state</b>',
+      '终态检查，关闭连接',
+      '释放 writer / 队列 / 订阅',
+      '保留 Stream <b>1800s</b>'
+    ]
+  ];
+
+  const POINTS = [
+    [
+      '<b>请求线程只做编排</b>：鉴权、落库、创建 messageId、返回 SseEmitter；它不会在这里等模型生成完。',
+      '<b>生成在另一条虚拟线程</b>：<code>agentStreamExecutor</code> 使用 <code>newVirtualThreadPerTaskExecutor</code>，请求线程返回后流仍能继续。',
+      '<b>START 同时三处可见</b>：Redis Stream / Pub/Sub / 浏览器；<code>messageId</code> 是后续重连的唯一定位符。',
+      '<b>队列从第一帧就存在</b>：每个 SseChannel 一条 512 的有界队列，writer 虚拟线程从队列 <code>take()</code>。'
+    ],
+    [
+      '<b>模型回调不在请求线程</b>：LangChain4j 的 token 回调落在 ForkJoinPool；<code>AgentTurnContext.runAs</code> 负责恢复用户、trace、轮次。',
+      '<b>先写历史再广播</b>：<code>publish()</code> 先 XADD，再 PUBLISH，最后 pushFrame；直推失败也不影响后续重连。',
+      '<b>生产与写出解耦</b>：generate 只做 <code>offer()</code>，writer 才做阻塞的 <code>emitter.send()</code>，慢客户端只堵自己的队列。',
+      '<b>队列满不是静默截断</b>：SseChannel 发 <code>INTERRUPTED</code>（resumable），客户端带 lastEventId 重连。'
+    ],
+    [
+      '<b>断开销毁的是连接对象</b>：SseChannel + writer + 队列；generate VT 和 Redis key 都还在。',
+      '<b>事件继续落历史</b>：seq5/6 只有 XADD / PUBLISH，没有 socket 写出。',
+      '<b>宽限 30 秒</b>：subscriberCount 归零后 watchdog 不会立刻取消，给用户重连窗口。',
+      '<b>超过宽限才取消</b>：无人重连才 <code>markCancelled</code>，避免为离开的用户持续烧 token。'
+    ],
+    [
+      '<b>重连不是重发问题</b>：GET + <code>lastEventId=4</code>，服务端只补 4 之后的事件。',
+      '<b>JWT 先变成 userId</b>：<code>UserContext.require()</code> 从请求 token 取身份，不信任客户端传的 userId。',
+      '<b>messageId → conversationId → owner</b>：<code>requireOwned</code> 失败返回 404，不区分“不存在”和“不是你的”。',
+      '<b>鉴权通过前什么都不做</b>：不 SUBSCRIBE、不 XRANGE、不创建可读通道；这是防串台的关键。'
+    ],
+    [
+      '<b>先订阅再读历史</b>：两步之间的事件进 <code>pendingBuffer</code>，不会永久丢失。',
+      '<b>订阅回调不直推</b>：事件只 add 到 pending，等历史补完再按 seq 合流。',
+      '<b>共享订阅</b>：每个 messageId 一份 listener，引用计数；不是每连接一个 Redis 订阅。',
+      '<b>权限在订阅之前</b>：只有 owner 通过才拿到这个 messageId 的 channel。'
+    ],
+    [
+      '<b>只读自己的 Stream</b>：XRANGE 的 key 带 messageId，过滤 <code>seq &gt; lastEventId</code>。',
+      '<b>历史帧仍走队列</b>：replay → <code>offer()</code> → writer VT；不绕过 SseChannel。',
+      '<b>DONE 可能在补历史期间到达</b>：先进 pending，避免与历史交叉乱序。',
+      '<b>队列有界</b>：512 满时断开并提示重连，不阻塞生成线程。'
+    ],
+    [
+      '<b>lastWrittenSeq 挡重复</b>：同一连接写出的 seq 必须严格递增。',
+      '<b>前端 lastSeq 再挡一次</b>：重放、重连、多路径重复都在浏览器侧丢弃。',
+      '<b>去重状态是私有的</b>：每个连接、每个浏览器各自维护，不共享。',
+      '<b>多实例同 seq 也安全</b>：Redis 里的 seq 是唯一裁判，谁先写谁生效。'
+    ],
+    [
+      '<b>终态只发一次</b>：历史末尾已有 DONE 就不再补，避免前端收到两次结束。',
+      '<b>资源释放</b>：writer / 队列 / 连接关闭；Stream 留 1800s 给刷新和重连。',
+      '<b>MAXLEN ~1000</b>：长对话不会无限增长；subscriber TTL 180s 防止幽灵订阅。',
+      '<b>多实例可续传</b>：历史在 Redis，实例 B 也能补；但 B 仍会重新做 owner 校验。'
+    ]
+  ];
+
+  const scene = $('#scene');
+  const wire = $('#wire');
+  const packetLayer = $('#packetLayer');
+  let current = 0;
+  let animTimers = [];
+
+  function setText(id, v) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = v;
+  }
+  function setStatus(id, text, tone) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text;
+    el.className = 'status ' + (tone || '');
+  }
+
+  function buildThreads() {
+    const box = $('#threads');
+    box.innerHTML = '';
+    THREAD_DEFS.forEach(def => {
+      const chip = document.createElement('span');
+      chip.className = 'thread-chip';
+      chip.dataset.thread = def.key;
+      chip.title = def.label + ' · ' + def.desc;
+      chip.innerHTML = '<span class="tc">' + def.code + '</span><b>' + def.label + '</b><small>' + def.desc + '</small>';
+      box.appendChild(chip);
+    });
+  }
+
+  function renderThreads(step) {
+    document.querySelectorAll('.thread-chip').forEach(chip => {
+      const state = step.threads[chip.dataset.thread] || 'idle';
+      chip.classList.remove('run', 'wait', 'closed');
+      if (state !== 'idle') chip.classList.add(state);
+    });
+  }
+
+  function renderQueue(step) {
+    const q = step.queue;
+    const qBox = $('#qBox');
+    const qCells = $('#qCells');
+    qBox.classList.toggle('active', q.items.length > 0);
+    qCells.innerHTML = '';
+    q.items.forEach((label, i) => {
+      const cell = document.createElement('span');
+      cell.className = 'qcell filled';
+      cell.textContent = label;
+      cell.style.animationDelay = (i * 40) + 'ms';
+      qCells.appendChild(cell);
+    });
+    for (let i = 0; i < Math.max(0, 6 - q.items.length); i++) {
+      const cell = document.createElement('span');
+      cell.className = 'qcell';
+      qCells.appendChild(cell);
+    }
+    if (q.items.length > 6) {
+      const more = document.createElement('span');
+      more.className = 'qcell more';
+      more.textContent = '+' + (q.items.length - 6);
+      qCells.appendChild(more);
+    }
+    setText('qCount', q.items.length + ' / 512');
+    setText('qNote', q.note);
+
+    const pBox = $('#pBox');
+    const pCells = $('#pCells');
+    pBox.classList.toggle('active', q.pending.length > 0);
+    pCells.innerHTML = '';
+    q.pending.forEach((label, i) => {
+      const cell = document.createElement('span');
+      cell.className = 'qcell filled';
+      cell.textContent = label;
+      cell.style.animationDelay = (i * 50) + 'ms';
+      pCells.appendChild(cell);
+    });
+    for (let i = 0; i < Math.max(0, 4 - q.pending.length); i++) {
+      const cell = document.createElement('span');
+      cell.className = 'qcell';
+      cell.textContent = '—';
+      pCells.appendChild(cell);
+    }
+    setText('pCount', q.pending.length);
+    setText('pNote', q.pendingNote);
+  }
+
+  function renderBrowser(step) {
+    const b = step.browser;
+    setText('browserSeq', b.lastSeq);
+    setText('browserSeqLabel', 'lastSeq = ' + b.lastSeq);
+    setText('browserText', b.text || '等待 START…');
+    setText('browserLabel', b.conn === 'OFFLINE' ? '浏览器 · 已断开' : b.conn === 'RECONNECTING' || b.conn === 'RESYNC' ? '浏览器 · 续传中' : '浏览器已渲染');
+    setStatus('browserBadge', b.conn, b.tone);
+    $('#browserStrip').classList.toggle('offline', b.conn === 'OFFLINE');
+  }
+
+  function renderActors(step) {
+    setStatus('agentBadge', step.agent.phase, step.agent.tone);
+    setStatus('redisBadge', step.redis.state, step.redis.tone);
+    setText('agentPhase', step.agent.phase);
+    setText('redisState', step.redis.state);
+    setText('redisSubs', String(step.redis.subs));
+    setText('redisCount', String(step.redis.count));
+  }
+
+  const WIRE_CAPTIONS = [
+    'POST /chat/stream → START',
+    'XADD / PUBLISH seq 2..4 → SSE DELTA',
+    'client offline → Redis continues seq 5,6',
+    'GET ?lastEventId=4 → owner check',
+    'SUBSCRIBE live → pendingBuffer',
+    'XRANGE seq > 4 → replay 5,6',
+    'pending seq7 → dedupe by seq',
+    'DONE → state DONE → close'
+  ];
+
+  function renderDetail(step, index) {
+    setText('kicker', step.kicker);
+    setText('title', step.title);
+    setText('desc', step.desc);
+    $('#explain').innerHTML = (POINTS[index] || []).map(p => '<li>' + p + '</li>').join('');
+    $('#substeps').innerHTML = (SUBSTEPS[index] || []).map(s => '<li>' + s + '</li>').join('');
+    setText('threadNote', step.threadNote);
+    setText('bodyLabel', step.bodyLabel);
+    setText('bodyMeta', step.bodyMeta);
+    $('#body').innerHTML = step.body;
+    $('#securityBody').innerHTML = step.security;
+    $('#security').classList.toggle('strict', !!step.strict);
+
+    setText('stageTitle', String(index + 1).padStart(2, '0') + ' · ' + step.title);
+    setText('wireCaption', WIRE_CAPTIONS[index] || '');
+    setText('stepNow', String(index + 1).padStart(2, '0'));
+    setText('midTop', '2113…434');
+    $('#fault').classList.toggle('show', !!step.fault);
+    $('#scene').classList.remove('enter');
+    void $('#scene').offsetWidth;
+    $('#scene').classList.add('enter');
+  }
+
+  function buildDots() {
+    const box = $('#dots');
+    box.innerHTML = '';
+    STEPS.forEach((s, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'dot-btn';
+      b.dataset.index = String(i);
+      b.textContent = String(i + 1).padStart(2, '0');
+      b.title = s.title;
+      b.addEventListener('click', () => go(i, true));
+      box.appendChild(b);
+    });
+  }
+
+  function renderDots(index) {
+    document.querySelectorAll('.dot-btn').forEach((b, i) => {
+      b.classList.toggle('active', i === index);
+      b.classList.toggle('done', i < index);
+    });
+    $('#prev').disabled = index === 0;
+    $('#next').disabled = index === STEPS.length - 1;
+  }
+
+  function clearPackets() {
+    animTimers.forEach(t => clearTimeout(t));
+    animTimers = [];
+    packetLayer.innerHTML = '';
+  }
+
+  function fly(action) {
+    const fromEl = document.querySelector('.actor[data-actor="' + action.from + '"]');
+    const toEl = document.querySelector('.actor[data-actor="' + action.to + '"]');
+    if (!fromEl || !toEl) return;
+    const wr = wire.getBoundingClientRect();
+    const fr = fromEl.getBoundingClientRect();
+    const tr = toEl.getBoundingClientRect();
+    const x0 = fr.left + fr.width / 2 - wr.left;
+    const x1 = tr.left + tr.width / 2 - wr.left;
+    const y = wr.height * (action.y == null ? .5 : action.y);
+    const dot = document.createElement('div');
+    dot.className = 'packet ' + (action.color || 'cyan') + (action.duplicate ? ' duplicate' : '');
+    dot.style.left = x0 + 'px';
+    dot.style.top = y + 'px';
+    const label = document.createElement('span');
+    label.className = 'packet-label';
+    label.textContent = action.label || '';
+    dot.appendChild(label);
+    packetLayer.appendChild(dot);
+    const dx = x1 - x0;
+    const anim = dot.animate([
+      { transform: 'translate(0,-50%) scale(.82)', opacity: 0 },
+      { transform: 'translate(0,-50%) scale(1)', opacity: 1, offset: .12 },
+      { transform: 'translate(' + dx + 'px,-50%) scale(1)', opacity: 1, offset: .84 },
+      { transform: 'translate(' + dx + 'px,-50%) scale(.9)', opacity: 0 }
+    ], { duration: 1050, easing: 'cubic-bezier(.22,.8,.26,1)', fill: 'forwards' });
+    anim.onfinish = () => dot.remove();
+  }
+
+  function animatePackets(step) {
+    clearPackets();
+    (step.packets || []).forEach(action => {
+      const timer = setTimeout(() => fly(action), action.delay || 0);
+      animTimers.push(timer);
+    });
+  }
+
+  function render(index, animate) {
+    current = index;
+    const step = STEPS[index];
+    $('#detail').classList.toggle('security-first', index === 3);
+    $('#detail').scrollTop = 0;
+    const stageEl = document.querySelector('.stage-panel');
+    if (stageEl) stageEl.scrollTop = 0;
+    renderActors(step);
+    renderThreads(step);
+    renderQueue(step);
+    renderBrowser(step);
+    renderDetail(step, index);
+    renderDots(index);
+    if (animate !== false) animatePackets(step);
+    else clearPackets();
+  }
+
+  function go(index, animate) {
+    const next = Math.max(0, Math.min(STEPS.length - 1, index));
+    render(next, animate !== false);
+  }
+
+  function init() {
+    buildThreads();
+    buildDots();
+    $('#prev').addEventListener('click', () => go(current - 1, true));
+    $('#next').addEventListener('click', () => go(current + 1, true));
+    $('#replay').addEventListener('click', () => animatePackets(STEPS[current]));
+    $('#restart').addEventListener('click', () => go(0, true));
+    document.addEventListener('keydown', e => {
+      if (e.target && /INPUT|SELECT|TEXTAREA|BUTTON/.test(e.target.tagName)) return;
+      if (e.key === 'ArrowRight') { e.preventDefault(); go(current + 1, true); }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); go(current - 1, true); }
+    });
+    render(0, false);
+    setTimeout(() => animatePackets(STEPS[0]), 260);
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>

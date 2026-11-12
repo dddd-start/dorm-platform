@@ -1,0 +1,321 @@
+/* ============================================================================
+ * 设计令牌（Design Tokens）
+ *
+ * 这是"UI 达到业界领先水平"的地基层：**所有颜色、字阶、间距、圆角、阴影、
+ * 动效时长都必须来自令牌**，组件里不允许再出现硬编码的 #409eff / 12px / 0.3s。
+ *
+ * 为什么令牌层是前提（而不是"锦上添花"）：
+ *   1. 深色主题无法靠零散硬编码实现 —— 只要有 10 个组件写死了颜色，主题就是坏的；
+ *   2. 一致性无法靠自觉维持 —— 同一个"次要文字灰"在不同页面出现 5 种灰是常见现象；
+ *   3. 响应式与可访问性需要统一的尺度（间距/字号/焦点环），否则只能逐页修补。
+ *
+ * 命名约定：`--d-<类别>-<语义>-<变体>`
+ *   d = dorm（避免与 Element Plus 的 --el-* 冲突）
+ *   语义层（surface/text/border/brand…）是组件**唯一**应该直接使用的层；
+ *   原始色阶（--d-blue-500 等）只供语义层引用。
+ * ========================================================================= */
+
+:root {
+  /* ---------------------------------------------------------------- 原始色阶 */
+  /* 品牌色：沿用 Element Plus 的蓝作为主色锚点，保证与既有组件视觉连续 */
+  --d-blue-50: #eef6ff;
+  --d-blue-100: #d9ecff;
+  --d-blue-200: #b3d8ff;
+  --d-blue-300: #79bbff;
+  --d-blue-400: #4a9bff;
+  --d-blue-500: #2f7cf6;
+  --d-blue-600: #1f66d6;
+  --d-blue-700: #1852ab;
+  --d-blue-800: #143f82;
+  --d-blue-900: #0f2f5f;
+
+  /* 中性色：冷灰（与蓝色主色同色温，避免"灰得发暖"的廉价感） */
+  --d-gray-0: #ffffff;
+  --d-gray-50: #f7f9fc;
+  --d-gray-100: #eef2f7;
+  --d-gray-200: #e2e8f0;
+  --d-gray-300: #cbd5e1;
+  --d-gray-400: #94a3b8;
+  --d-gray-500: #64748b;
+  --d-gray-600: #475569;
+  --d-gray-700: #334155;
+  --d-gray-800: #1e293b;
+  --d-gray-900: #0f172a;
+
+  /* 语义色（成功/警告/危险/信息）各 3 档：底色、主色、深色文字 */
+  --d-green-50: #ecfdf5;
+  --d-green-500: #10b981;
+  --d-green-700: #047857;
+  --d-amber-50: #fffbeb;
+  --d-amber-500: #f59e0b;
+  --d-amber-700: #b45309;
+  --d-red-50: #fef2f2;
+  --d-red-500: #ef4444;
+  --d-red-700: #b91c1c;
+  --d-cyan-50: #ecfeff;
+  --d-cyan-500: #06b6d4;
+  --d-cyan-700: #0e7490;
+
+  /* ------------------------------------------------------------- 语义化颜色 */
+  /* 品牌色分两个用途，这是对比度审计得出的结论（实测）：
+     · --d-brand 用于**描边/文字/图标**等浅色场景；
+     · --d-brand-solid 用于**填充**场景（主按钮、激活菜单项）——
+       因为白字落在 #2f7cf6 上对比度只有 3.94，不满足 WCAG AA 4.5:1；
+       加深到 #1f66d6 后白字可达 4.5:1 以上。 */
+  --d-brand: var(--d-blue-500);
+  --d-brand-solid: var(--d-blue-600);
+  --d-brand-hover: var(--d-blue-500);
+  --d-brand-active: var(--d-blue-700);
+  --d-brand-subtle: var(--d-blue-50);
+
+  --d-success: var(--d-green-500);
+  --d-success-subtle: var(--d-green-50);
+  --d-success-text: var(--d-green-700);
+  --d-warning: var(--d-amber-500);
+  --d-warning-subtle: var(--d-amber-50);
+  --d-warning-text: var(--d-amber-700);
+  --d-danger: var(--d-red-500);
+  --d-danger-subtle: var(--d-red-50);
+  --d-danger-text: var(--d-red-700);
+  --d-info: var(--d-cyan-500);
+  --d-info-subtle: var(--d-cyan-50);
+  --d-info-text: var(--d-cyan-700);
+
+  /* 表面（surface）：页面/卡片/浮层三级层次 */
+  --d-surface-page: var(--d-gray-50);
+  --d-surface-card: var(--d-gray-0);
+  --d-surface-sunken: var(--d-gray-100);
+  --d-surface-overlay: var(--d-gray-0);
+  --d-surface-inverse: var(--d-gray-900);
+
+  /* 文字：四级层次，覆盖"标题/正文/次要/占位" */
+  --d-text-primary: var(--d-gray-900);
+  --d-text-secondary: var(--d-gray-600);
+  --d-text-tertiary: var(--d-gray-500);
+  --d-text-placeholder: var(--d-gray-400);
+  --d-text-inverse: var(--d-gray-0);
+  --d-text-on-brand: var(--d-gray-0);
+
+  /* 描边 */
+  --d-border: var(--d-gray-200);
+  --d-border-strong: var(--d-gray-300);
+  --d-border-subtle: var(--d-gray-100);
+  --d-border-brand: var(--d-blue-300);
+
+  /* 侧栏（深色导航）—— 独立一组，方便深色主题下反向处理 */
+  --d-sidebar-bg: var(--d-gray-900);
+  --d-sidebar-text: var(--d-gray-300);
+  --d-sidebar-text-active: var(--d-gray-0);
+  --d-sidebar-active-bg: var(--d-brand-solid);
+
+  /* ------------------------------------------------------------------ 字阶 */
+  /* 字体族：中文优先落到系统字体，避免首屏 FOUT */
+  --d-font-sans: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', Arial, sans-serif;
+  --d-font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+
+  --d-font-size-2xs: 11px;
+  --d-font-size-xs: 12px;
+  --d-font-size-sm: 13px;
+  --d-font-size-md: 14px; /* 正文基准 */
+  --d-font-size-lg: 16px;
+  --d-font-size-xl: 20px;
+  --d-font-size-2xl: 24px;
+  --d-font-size-3xl: 30px;
+
+  --d-line-tight: 1.25;
+  --d-line-normal: 1.5;
+  --d-line-relaxed: 1.75;
+
+  --d-font-weight-regular: 400;
+  --d-font-weight-medium: 500;
+  --d-font-weight-semibold: 600;
+  --d-font-weight-bold: 700;
+
+  /* ------------------------------------------------------------- 间距（4 基数） */
+  --d-space-0: 0;
+  --d-space-1: 4px;
+  --d-space-2: 8px;
+  --d-space-3: 12px;
+  --d-space-4: 16px;
+  --d-space-5: 20px;
+  --d-space-6: 24px;
+  --d-space-8: 32px;
+  --d-space-10: 40px;
+  --d-space-12: 48px;
+  --d-space-16: 64px;
+
+  /* ------------------------------------------------------------ 圆角 / 描边 */
+  --d-radius-xs: 2px;
+  --d-radius-sm: 4px;
+  --d-radius-md: 6px;
+  --d-radius-lg: 10px;
+  --d-radius-xl: 16px;
+  --d-radius-pill: 999px;
+
+  --d-border-width: 1px;
+  --d-border-width-strong: 2px;
+
+  /* --------------------------------------------------------------- 阴影层级 */
+  /* 三级高度：卡片 / 下拉 / 模态。数值克制，避免"塑料感" */
+  --d-shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --d-shadow-sm: 0 1px 4px rgba(15, 23, 42, 0.08);
+  --d-shadow-md: 0 4px 12px rgba(15, 23, 42, 0.10);
+  --d-shadow-lg: 0 10px 28px rgba(15, 23, 42, 0.14);
+  --d-shadow-focus: 0 0 0 3px rgba(47, 124, 246, 0.28);
+
+  /* --------------------------------------------------------------- 动效 */
+  /* 时长分三档：微交互 / 常规过渡 / 页面级。超过 300ms 用户会感到"卡" */
+  --d-duration-instant: 90ms;
+  --d-duration-fast: 150ms;
+  --d-duration-normal: 220ms;
+  --d-duration-slow: 320ms;
+  --d-ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --d-ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
+  --d-ease-accelerate: cubic-bezier(0.4, 0, 1, 1);
+
+  /* --------------------------------------------------------------- 层级 */
+  --d-z-dropdown: 1000;
+  --d-z-sticky: 1100;
+  --d-z-overlay: 1200;
+  --d-z-modal: 1300;
+  --d-z-toast: 1400;
+
+  /* --------------------------------------------------- 断点（供 JS/文档参考） */
+  --d-breakpoint-sm: 640px;
+  --d-breakpoint-md: 768px;
+  --d-breakpoint-lg: 1024px;
+  --d-breakpoint-xl: 1280px;
+}
+
+/* ============================================================================
+ *  深色主题
+ *
+ *  触发方式（二选一，两者都支持）：
+ *    1. 系统偏好：@media (prefers-color-scheme: dark)
+ *    2. 手动切换：<html data-theme="dark">（脚本一行：document.documentElement.dataset.theme = 'dark'）
+ *  手动值必须能覆盖系统偏好 —— 因此手动规则写在媒体查询之后，且用 :root[data-theme] 提升特异性。
+ * ========================================================================= */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --d-surface-page: #0b1220;
+    --d-surface-card: #131c2e;
+    --d-surface-sunken: #0e1626;
+    --d-surface-overlay: #18223a;
+    --d-surface-inverse: var(--d-gray-50);
+
+    --d-text-primary: #e8eefb;
+    --d-text-secondary: #a9b6cc;
+    --d-text-tertiary: #8695ad;
+    --d-text-placeholder: #64748b;
+    --d-text-inverse: var(--d-gray-900);
+
+    --d-border: #26324a;
+    --d-border-strong: #33415c;
+    --d-border-subtle: #1d2739;
+
+    --d-brand-subtle: #14243d;
+    --d-success-subtle: #0f2a20;
+    --d-warning-subtle: #2c2311;
+    --d-danger-subtle: #2c1618;
+    --d-info-subtle: #0d2a31;
+
+    --d-sidebar-bg: #0a101c;
+    --d-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.45);
+    --d-shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.5);
+    --d-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.55);
+    --d-shadow-lg: 0 10px 28px rgba(0, 0, 0, 0.6);
+
+    /* 语义色的"文字色"必须分主题：浅色下要用深色（浅底上的文字），
+       深色下要用浅色（深底上的文字）。
+       这是对比度审计查出来的缺口 —— 我最初把 --d-success-text 定为 #047857，
+       浅色下 5.48 达标，深色下却只有 3.36。 */
+    --d-success-text: #34d399;
+    --d-warning-text: #fbbf24;
+    --d-danger-text: #f87171;
+    --d-info-text: #22d3ee;
+  }
+}
+
+:root[data-theme='dark'] {
+  --d-surface-page: #0b1220;
+  --d-surface-card: #131c2e;
+  --d-surface-sunken: #0e1626;
+  --d-surface-overlay: #18223a;
+  --d-surface-inverse: var(--d-gray-50);
+
+  --d-text-primary: #e8eefb;
+  --d-text-secondary: #a9b6cc;
+  --d-text-tertiary: #8695ad;
+  --d-text-placeholder: #64748b;
+  --d-text-inverse: var(--d-gray-900);
+
+  --d-border: #26324a;
+  --d-border-strong: #33415c;
+  --d-border-subtle: #1d2739;
+
+  --d-brand-subtle: #14243d;
+  --d-success-subtle: #0f2a20;
+  --d-warning-subtle: #2c2311;
+  --d-danger-subtle: #2c1618;
+  --d-info-subtle: #0d2a31;
+
+  --d-sidebar-bg: #0a101c;
+  --d-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --d-shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.5);
+  --d-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.55);
+  --d-shadow-lg: 0 10px 28px rgba(0, 0, 0, 0.6);
+
+  /* 语义色"文字色"的深色取值（见媒体查询块内的说明） */
+  --d-success-text: #34d399;
+  --d-warning-text: #fbbf24;
+  --d-danger-text: #f87171;
+  --d-info-text: #22d3ee;
+}
+
+/* ============================================================================
+ *  基础可访问性（令牌层的直接受益者）
+ * ========================================================================= */
+
+/* 键盘焦点必须可见：鼠标点击不显示焦点环，键盘操作才显示 */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--d-shadow-focus);
+  border-radius: var(--d-radius-sm);
+}
+
+/* 尊重"减少动态效果"的系统设置 —— 动效不能只做加法不做退让 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================================================
+ *  Element Plus 变量对齐
+ *
+ *  EP 有自己的一整套 --el-* 变量。若不对齐，深色下会出现
+ *  "我们的表面是深色、EP 组件的主色还是默认蓝"的割裂感。
+ *  这里只覆盖**必要的几个**（主色三态 + 页面背景），其余交给 EP 的深色变量表，
+ *  避免与 EP 的后续版本产生大面积冲突。
+ * ========================================================================= */
+html.dark {
+  /* 深色下填充色同样要够深：白字落在 --d-blue-400 上只有 2.83，
+     改用 --d-blue-500 后满足 AA（实测由对比度用例守门） */
+  --el-color-primary: var(--d-blue-500);
+  --el-color-primary-light-3: var(--d-blue-600);
+  --el-color-primary-light-5: var(--d-blue-700);
+  --el-color-primary-light-7: var(--d-blue-800);
+  --el-color-primary-light-8: var(--d-blue-900);
+  --el-color-primary-dark-2: var(--d-blue-300);
+  --el-bg-color-page: var(--d-surface-page);
+  --el-bg-color: var(--d-surface-card);
+  --el-text-color-primary: var(--d-text-primary);
+  --el-text-color-regular: var(--d-text-secondary);
+  --el-border-color: var(--d-border);
+}

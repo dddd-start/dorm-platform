@@ -1,0 +1,14 @@
+env
+data
+logs
+run
+target
+**/target
+node_modules
+**/node_modules
+ui-service/dist
+.git
+.idea
+config/.env*
+!config/.env.example
+*.log
