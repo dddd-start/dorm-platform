@@ -33,7 +33,7 @@ java -jar dorm-service/target/dorm-service.jar
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/internal/health` | 健康检查（只需服务令牌） |
+| GET | `/internal/health` | 健康检查（**需服务令牌**，2026-11 起不再免鉴权） |
 | GET | `/internal/catalog/regions/options` | 启动期区域目录（只需服务令牌） |
 | GET | `/internal/agent/regions/options` | 当前用户可见区域 |
 | GET | `/internal/agent/regions/{id}/beds/summary` | 区域床位汇总 |

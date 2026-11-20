@@ -46,7 +46,8 @@ spring:
 
 server:
   port: ${DORM_PORT:8081}
-  address: 0.0.0.0
+  # 内部服务默认只绑回环：对外只经 ui-service 反代暴露，避免直连内部接口
+  address: ${DORM_BIND_ADDRESS:127.0.0.1}
   shutdown: graceful
   lifecycle:
     timeout-per-shutdown-phase: 30s
@@ -80,7 +81,8 @@ mybatis-plus:
 dorm:
   internal:
     # agent-service 调用 /internal/** 时携带的服务令牌
-    token: ${DORM_INTERNAL_TOKEN:dev-internal-token}
+    # 不再提供默认值：缺失即启动失败，避免"忘配环境变量也能跑"导致的默认令牌后门
+    token: ${DORM_INTERNAL_TOKEN}
   audit:
     async: ${DORM_AUDIT_ASYNC:true}
   security:

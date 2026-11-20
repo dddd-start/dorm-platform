@@ -44,9 +44,11 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .excludePathPatterns(PUBLIC_PATHS)
                 .order(1);
 
+        // /internal/health 曾在排除列表里，等于把内部面暴露成"无鉴权健康检查"：
+        // 服务绑 0.0.0.0 时任何人 curl 8081 就能摸到内部接口族。
+        // 现在统一要求内部令牌；健康检查请走 /actuator/health（本服务已暴露）。
         registry.addInterceptor(internalAuthInterceptor)
                 .addPathPatterns("/internal/**")
-                .excludePathPatterns("/internal/health")
                 .order(2);
     }
 
