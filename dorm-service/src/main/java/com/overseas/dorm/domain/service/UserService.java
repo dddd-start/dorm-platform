@@ -75,6 +75,9 @@ public class UserService {
         }
         // 员工只能看自己；管理员可看他人（但不返回明文手机号）
         dataScope.assertSelfOrAdmin(id);
+        // 上面只区分「员工 / 管理员」，对区域管理员等于全放行：sea.admin 能读欧洲区管理员 9003。
+        // 用户也是带区域的数据，必须再走一次区域校验（总管理员不受限）。
+        dataScope.assertRegionAccess(user.getRegionId());
         Region region = user.getRegionId() == null ? null : regionMapper.selectById(user.getRegionId());
         return UserVO.of(user, region == null ? null : region.getName());
     }
@@ -158,9 +161,14 @@ public class UserService {
         userMapper.updateById(update);
         auditService.success(AuditEnums.Module.USER, "USER_UPDATE", "SYS_USER", request.id(),
                 maskForAudit(exists), maskForAudit(userMapper.selectById(request.id())));
-        // 角色/区域变更会让旧 token 里的声明过期，强制该用户重新登录
-        if (exists.getRole() != request.role() || !java.util.Objects.equals(exists.getRegionId(), request.regionId())) {
-            log.info("用户角色/区域变更，其现有会话将在下次校验时失效 userId={}", request.id());
+        // 角色/区域变更会让旧 token 里的声明过期。原实现只打了一行日志，注释却写"强制该用户重新登录"——
+        // 实际旧 token 里的 role/regionId 声明照旧可用满 12h，属于降权不生效。
+        // 现在真正吊销：三条路径（改密、降权/换区域、禁用）都递增认证版本。
+        if (exists.getRole() != request.role()
+                || !java.util.Objects.equals(exists.getRegionId(), request.regionId())
+                || (request.password() != null && !request.password().isBlank())) {
+            authService.revokeAllSessions(request.id());
+            log.info("用户角色/区域/口令变更，已吊销其全部会话 userId={}", request.id());
         }
         return detail(request.id());
     }
@@ -229,6 +237,10 @@ public class UserService {
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<SysUser>()
                 .eq(SysUser::getStatus, 1)
                 .eq(role != null, SysUser::getRole, role);
+        // 下拉同样泄露人员名册：区域管理员只应看到本区人员。
+        // 原实现无任何区域条件，sea.admin 拉一次就能拿到全公司名单。
+        Long scopeRegion = dataScope.visibleRegionId();
+        wrapper.eq(scopeRegion != null, SysUser::getRegionId, scopeRegion);
         if (keyword != null && !keyword.isBlank()) {
             wrapper.and(w -> w.like(SysUser::getRealName, keyword)
                     .or().like(SysUser::getUsername, keyword)

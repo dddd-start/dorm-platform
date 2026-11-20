@@ -351,7 +351,10 @@ public class AuthService {
         update.setId(userId);
         update.setPassword(passwordEncoder.encode(request.newPassword()));
         userMapper.updateById(update);
-        log.info("用户修改密码成功 userId={}", userId);
+        // javadoc 一直承诺"修改成功后强制下线"，但方法体从未实现 —— 改密后旧 token 仍可用满 12h。
+        // 递增认证版本即可让该用户所有旧令牌立即失效（O(1)、无竞态）。
+        revokeAllSessions(userId);
+        log.info("用户修改密码成功并吊销全部旧会话 userId={}", userId);
     }
 
     /** 供用户管理模块复用：统一密码编码器。 */
