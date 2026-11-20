@@ -240,22 +240,18 @@ public class ConversationService {
                                      String turnId, String traceId) {
         appendMessage(conversationId, AgentEnums.Role.USER, userMessage, turnId, traceId);
         // 会话计数 + 时间 + 标题（条件更新，只在仍是默认标题时写入）
+        // 标题来自用户消息，**必须参数绑定**，不能拼进 SQL 字符串：
+        // 原实现用 sqlLiteral 只把单引号换成两个，没处理反斜杠（MySQL 默认反斜杠是转义符），
+        // 构造 "\\' OR 1=1 -- " 之类的输入即构成写路径 SQL 注入。
         conversationMapper.update(null,
                 new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<AgentConversation>()
                         .eq(AgentConversation::getId, conversationId)
                         .setSql("message_count = COALESCE(message_count, 0) + 1")
                         .set(AgentConversation::getLastMessageTime, LocalDateTime.now())
-                        .setSql("title = CASE WHEN title IS NULL OR title = '" + DEFAULT_TITLE
-                                + "' THEN " + sqlLiteral(truncate(userMessage, 60))
-                                + " ELSE title END"));
+                        .setSql("title = CASE WHEN title IS NULL OR title = {0} THEN {1} ELSE title END",
+                                DEFAULT_TITLE, truncate(userMessage, 60)));
         return appendMessage(conversationId, AgentEnums.Role.ASSISTANT, "", null, null, null,
                 turnId, traceId, AgentEnums.MessageStatus.STREAMING, null, null, 0, 0);
-    }
-
-    /** 把字符串安全地转成 SQL 字面量（仅用于上面那条 CASE WHEN 标题更新，值来自用户消息）。 */
-    private static String sqlLiteral(String value) {
-        String safe = value == null ? "" : value.replace("'", "''");
-        return "'" + safe + "'";
     }
 
     /**

@@ -129,6 +129,10 @@ public class BuildingService {
         if (exists == null) {
             throw BizException.of(ResultCode.BUILDING_NOT_FOUND);
         }
+        // 编辑路径必须**两次**校验：目标区域（上面已校验）与**原区域**。
+        // 否则区域管理员可以把别区的公寓"改"到自己区域，等于凭空搬走他人数据。
+        // 参考 RoomService.save 的同类校验，这里是单点遗漏，已补。
+        dataScope.assertRegionAccess(exists.getRegionId());
         // 换区域时必须同步刷新房间的冗余 regionId，否则数据权限会失效
         boolean regionChanged = !exists.getRegionId().equals(request.regionId());
 
