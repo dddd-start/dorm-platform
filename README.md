@@ -28,8 +28,17 @@
 |---|---|
 | ![房源查询](docs/screenshots/02-rooms.png) | ![Agent 运营看板](docs/screenshots/09-agent-ops.png) |
 
-> 更多截图与「每张图想证明什么」见 [`docs/screenshots/manifest.md`](docs/screenshots/manifest.md)；
-> AI 助手流式输出的动图在 [`docs/screenshots/agent-stream.gif`](docs/screenshots/agent-stream.gif)。
+> 更多截图与「每张图想证明什么」见 [`docs/screenshots/manifest.md`](docs/screenshots/manifest.md)。
+
+### 两段动图（均为本机实跑录制，非剪辑）
+
+| 动图 | 内容 | 证明什么 |
+|---|---|---|
+| [`docs/media/agent-stream.gif`](docs/media/agent-stream.gif) | AI 助手回答「上海员工去新加坡出差，怎么申请宿舍？」的完整流式过程 | **工具调用可见**（`searchPolicies` / `listRegions` 带真实入参与返回）、RAG 已启用、回答带制度条款溯源、逐字生成而非一次性返回 |
+| [`docs/media/demo-walkthrough.gif`](docs/media/demo-walkthrough.gif) | 登录 → 统计看板 → 房源查询 → 审批页 → AI 助手 | 三服务联调、区域数据权限、状态机 UI 全链路可用 |
+
+> 录制方式：Playwright 驱动真实浏览器跑在本机三服务上，逐帧截图后用 Pillow 合成 GIF。
+> 复现命令见 [`docs/verification/report.md`](docs/verification/report.md)（138 单测 / 12 冒烟 / 27 回归 + 三服务启动步骤）。
 
 ---
 
