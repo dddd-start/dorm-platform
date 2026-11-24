@@ -270,7 +270,7 @@ dorm-platform/
 | 服务边界与模块设计 | [`docs/architecture.md`](docs/architecture.md) |
 | SSE 流式全链路（准入 → 生成 → 收口 → 续传 → 背压） | [`docs/agent-sse-design.md`](docs/agent-sse-design.md) |
 | 为什么这么拆、代码落在哪 | [`docs/migration.md`](docs/migration.md) |
-| 验收记录与实测数字 | [`docs/verification.md`](docs/verification.md) · [`docs/verification/report.md`](docs/verification/report.md)（[PDF](docs/verification/report.pdf)）· [`docs/parity.md`](docs/parity.md) |
+| 验收记录与实测数字 | [`docs/verification.md`](docs/verification.md) · [`docs/verification/report.md`](docs/verification/report.md)（[PDF](docs/verification/report.pdf)，由同一份 md 渲染）· [`docs/parity.md`](docs/parity.md) |
 | 7 张架构 / 时序图 | [`docs/diagrams/`](docs/diagrams) |
 | 截图清单 | [`docs/screenshots/manifest.md`](docs/screenshots/manifest.md) |
 
