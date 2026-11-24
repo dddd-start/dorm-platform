@@ -24,7 +24,7 @@ now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
 md = []
 md.append('# 验收报告（dorm-platform）\n')
 md.append(f'> 生成时间 {now} · 数据来源：`*/target/surefire-reports/TEST-*.xml`（Maven Surefire 原始输出）\n')
-md.append('> 本文件由 `scripts/make-verification.sh` 生成，重跑即可复现同一组数字。\n')
+md.append('> 本文件由 `bash scripts/make-verification.sh` 生成，重跑即可复现同一组数字。\n')
 md.append('\n## 一、结论\n')
 md.append('| 验收项 | 结果 | 复跑命令 |\n|---|---|---|')
 md.append(f'| 后端单元测试 | **{tot} / {tot} 通过**（失败 {fail}、错误 {err}、跳过 {skip}） | `mvn test` |')
@@ -42,7 +42,7 @@ md.append('| 模块 | 测试类 | 用例 | 耗时 | 失败 |\n|---|---|---|---|-
 for r in sorted(rows, key=lambda x: (x['module'], x['name'])):
     md.append(f"| {r['module']} | `{r['name']}` | {r['tests']} | {r['time']:.2f}s | {r['failures'] + r['errors']} |")
 md.append('\n## 四、口径说明\n')
-md.append('- **138** = `dorm-contract` 47 + `agent-service` 91，与 README / 简历一致；')
+md.append('- **138** = `dorm-contract` 47 + `agent-service` 91，与 README 声明一致；')
 md.append('- **12 冒烟** = 健康检查 4 + 登录 1 + 业务 API 3 + Agent 4；')
 md.append('- **27 回归** = 真实建单 → 审批分床 → 入住 → 退房的全流程（需要 MySQL/Redis，**不进 CI**）；')
 md.append('- 27 项回归不进 GitHub Actions 的原因见 README「已知限制」第 1 条。\n')

@@ -1,6 +1,6 @@
 # 验收报告（dorm-platform）
 
-> 生成时间 2026-11-24 16:43 · 数据来源：`*/target/surefire-reports/TEST-*.xml`（Maven Surefire 原始输出）
+> 生成时间 2026-11-24 17:08 · 数据来源：`*/target/surefire-reports/TEST-*.xml`（Maven Surefire 原始输出）
 
 > 本文件由 `bash scripts/make-verification.sh` 生成，重跑即可复现同一组数字。
 
@@ -50,7 +50,7 @@
 
 ## 四、口径说明
 
-- **138** = `dorm-contract` 47 + `agent-service` 91，与 README / 简历一致；
+- **138** = `dorm-contract` 47 + `agent-service` 91，与 README 声明一致；
 - **12 冒烟** = 健康检查 4 + 登录 1 + 业务 API 3 + Agent 4；
 - **27 回归** = 真实建单 → 审批分床 → 入住 → 退房的全流程（需要 MySQL/Redis，**不进 CI**）；
 - 27 项回归不进 GitHub Actions 的原因见 README「已知限制」第 1 条。
