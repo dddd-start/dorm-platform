@@ -38,7 +38,8 @@
 | [`docs/media/demo-walkthrough.gif`](docs/media/demo-walkthrough.gif) | 登录 → 统计看板 → 房源查询 → 审批页 → AI 助手 | 三服务联调、区域数据权限、状态机 UI 全链路可用 |
 
 > 录制方式：Playwright 驱动真实浏览器跑在本机三服务上，逐帧截图后用 Pillow 合成 GIF。
-> 复现命令见 [`docs/verification/report.md`](docs/verification/report.md)（138 单测 / 12 冒烟 / 27 回归 + 三服务启动步骤）。
+> 复现命令与实测数据见 [`docs/verification/report.md`](docs/verification/report.md)（138 单测 / 12 冒烟 / 27 回归）；
+> 三服务启动步骤见上面「快速开始」。
 
 ---
 
