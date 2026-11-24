@@ -105,6 +105,10 @@ docker compose -f deploy/docker-compose.yml up --build
 种子数据在 `dorm-service/src/main/resources/db/migration/V2__seed_data.sql`；
 `deploy/mysql-init/` 负责首次建库建账号，`ui-service/deploy/nginx.conf` 负责反代与 SSE 不缓冲。
 
+> ⚠️ **仅限本机/内网演示**：`deploy/docker-compose.yml` 里的数据库口令、JWT secret、
+> 内部服务令牌、手机号加密 key 都是**开发用固定值**，且服务默认监听 `0.0.0.0`。
+> 上公网前必须全部换成环境变量注入，并收敛监听地址与 CORS 白名单（见「已知限制」第 1、10 条）。
+
 ### 演示账号（种子数据）
 
 | 账号 | 密码 | 角色 |
@@ -263,9 +267,9 @@ dorm-platform/
 
 ---
 
-## 十一、已知限制（自己先说出来，别等面试官戳）
+## 十一、已知限制
 
-这个项目是个人练手 + 面试演示性质，没有线上流量。下面这些点**确实没做到**，
+这个项目是个人练手性质，没有线上流量。下面这些点**确实没做到**，
 列出来是为了把"能力边界"讲清楚，而不是包装成"已完成"：
 
 | # | 限制 | 现状 | 如果上线会怎么改 |
