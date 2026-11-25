@@ -273,6 +273,7 @@ dorm-platform/
 | 为什么这么拆、代码落在哪 | [`docs/migration.md`](docs/migration.md) |
 | 验收记录与实测数字 | [`docs/verification.md`](docs/verification.md) · [`docs/verification/report.md`](docs/verification/report.md)（[PDF](docs/verification/report.pdf)，由同一份 md 渲染）· [`docs/parity.md`](docs/parity.md) |
 | 7 张架构 / 时序图 | [`docs/diagrams/`](docs/diagrams) |
+| **LangChain4j 生产化笔记（10 章，外链）** | [dddd-start/langchain4j-in-action](https://github.com/dddd-start/langchain4j-in-action) |
 | 截图清单 | [`docs/screenshots/manifest.md`](docs/screenshots/manifest.md) |
 
 ---
