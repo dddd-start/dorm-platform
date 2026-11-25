@@ -111,7 +111,7 @@ docker compose -f deploy/docker-compose.yml up --build
 ```
 
 五个容器：MySQL、Redis、dorm-service、agent-service、ui-service；库表由 Flyway 自动迁移，
-种子数据在 `dorm-service/src/main/resources/db/migration/V2__seed_data.sql`；
+种子数据在 `dorm-service/src/main/resources/db/migration/` 下的 `V2__seed_data.sql`；
 `deploy/mysql-init/` 负责首次建库建账号，`ui-service/deploy/nginx.conf` 负责反代与 SSE 不缓冲。
 
 > 注意：`deploy/docker-compose.yml` 中的数据库口令、JWT secret、内部服务令牌与手机号加密 key
