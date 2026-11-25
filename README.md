@@ -116,7 +116,7 @@ docker compose -f deploy/docker-compose.yml up --build
 
 > 注意：`deploy/docker-compose.yml` 中的数据库口令、JWT secret、内部服务令牌与手机号加密 key
 > 均为开发用固定值，服务默认监听 `0.0.0.0`。部署到公网前需改为环境变量注入，
-> 并收敛监听地址与 CORS 白名单，详见「十一、已知限制」第 1、10 条。
+> 并收敛监听地址与 CORS 白名单，详见 [`docs/verification.md`](docs/verification.md) §10.3。
 
 ### 演示账号（种子数据）
 
@@ -184,7 +184,7 @@ docker compose -f deploy/docker-compose.yml up --build
 
 - 登录签发 JWT，同时写 Redis **会话白名单 + 认证版本 epoch**；登出 / 改密 / 强制下线通过 epoch 让旧 token 立刻失效；
 - 服务间调用 `/internal/**` 需 `X-Internal-Token`，且仍要透传并重新校验用户 JWT（服务身份 ≠ 用户身份）；
-- **员工手机号**（`sys_user.phone`）以 AES-256-GCM 密文入库，列表与 Prompt 只出现掩码（公寓联系人电话仍是明文，见「已知限制」）；提示词注入检测 + 内容护栏 + 流式窗口拦截；
+- **员工手机号**（`sys_user.phone`）以 AES-256-GCM 密文入库，列表与 Prompt 只出现掩码（公寓联系人电话仍是明文，见 [`docs/verification.md`](docs/verification.md) §10.3）；提示词注入检测 + 内容护栏 + 流式窗口拦截；
 - 限流：20 轮/分钟（突发 5）、单用户 3 条并发流、全局 1000 条、每日 token 预算可配；超限有 `BLOCKED` 事件与明确原因。
 
 ### 6.5 一致性：Outbox + 幂等
@@ -274,24 +274,3 @@ dorm-platform/
 | 7 张架构 / 时序图 | [`docs/diagrams/`](docs/diagrams) |
 | LangChain4j 生产化笔记（10 章，外部仓库） | [dddd-start/langchain4j-in-action](https://github.com/dddd-start/langchain4j-in-action) |
 | 截图清单 | [`docs/screenshots/manifest.md`](docs/screenshots/manifest.md) |
-
----
-
-## 十一、已知限制
-
-本项目仅在本机/内网运行，未部署到线上。以下限制尚未解决：
-
-| # | 限制 | 现状 | 改进方向 |
-|---|---|---|---|
-| 1 | 27 项回归不进 CI | 需要真实 MySQL/Redis，`scripts/regression.sh` 本地复跑；CI 只跑零依赖的 138 单测 | 用 Testcontainers 起 MySQL/Redis，或给 runner 加 compose 服务 |
-| 2 | **公寓联系人电话是明文** | 只有员工手机号走了 AES-256-GCM；`building.contact_phone` 未加密 | 同一套 `PhoneCipher` 复用过去，或改成只存分机 |
-| 3 | **`/actuator/prometheus` 不存在** | `application.yml` 里写了 exposure 但 pom 没加 `micrometer-registry-prometheus`，实际 404；只有 `/actuator/health`、`/metrics` 可用 | 加一个依赖即可，或把配置项删掉避免误导 |
-| 4 | **提前预订语义有限** | `availableBeds` 是"此刻可分配的床位数"，不校验未来日期区间冲突（提前 6 个月可提交申请，但床位是快照模型） | 上 `bed_occupancy(bed_id, date_from, date_to)` 区间表 + 唯一约束 |
-| 5 | **审计异步写不参与事务** | `AuditService` 用独立线程写库；业务回滚时可能留下"操作已成功"的假审计 | 改 `@TransactionalEventListener(AFTER_COMMIT)`，或审计与业务同事务 |
-| 6 | **区域隔离的审计面** | 业务数据（房间/申请/订单）已收口；`audit_log` 表没有 `region_id`，多态 target 无法反查区域，区域管理员看审计只能靠角色门禁 | 写入时固化 `region_id` 字段，查询时直接按列过滤 |
-| 7 | **写操作的幂等窗口** | 幂等键无 TTL、全局唯一；同一键跨用户会冲突 | 加 `(user_id, key)` 联合唯一 + TTL |
-| 8 | **Agent 的"停止生成"只停本地推送** | 取消后上游模型 HTTP 流仍在跑（LangChain4j 不暴露 abort 句柄），token 仍在计费 | 换支持中断的客户端，或把调用改成可 cancel 的异步任务 |
-| 9 | **长期记忆是模型自由文本** | 原样拼进 system prompt，未做不可信内容包裹 | 结构化字段 + 白名单 + 注入检测后再回灌 |
-| 10 | **CORS 放得较宽** | 允许 `192.168.*` / `10.*` 任意来源且 `allowCredentials=true`（为了内网多机调试） | 收敛成配置白名单 |
-
-token 吊销、跨区越权、写路径 SQL 注入三项已于 2026-11 修复，改动见 `git log` 与 [`docs/design-notes/`](docs/design-notes/README.md)。

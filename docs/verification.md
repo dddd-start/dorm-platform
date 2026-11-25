@@ -168,7 +168,26 @@ RAG 命中指标回归：修复前 `rag_retrieval_log=4` 而 `agent_usage_daily.
   Playwright 冒烟都不在 GitHub Actions 里（会消耗额度或需要外部服务）。
 - **前端只有类型检查与构建**：没有 vitest 单测、ESLint 与 E2E 门禁。
 
-### 10.3 领域与集成
+### 10.3 代码层面的已知缺陷
+
+以下 10 项已定位、尚未修复，按影响面排列：
+
+| # | 问题 | 现状 | 改进方向 |
+|---|---|---|---|
+| 1 | 回归测试不进 CI | 需要真实 MySQL/Redis，`scripts/regression.sh` 本地执行；CI 只跑零依赖的 138 单测 | 用 Testcontainers 起 MySQL/Redis，或给 runner 加 compose 服务 |
+| 2 | 公寓联系人电话是明文 | 只有员工手机号走 AES-256-GCM，`building.contact_phone` 未加密 | 复用 `PhoneCipher`，或只存分机 |
+| 3 | `/actuator/prometheus` 实际 404 | `application.yml` 写了 exposure 但未引入 `micrometer-registry-prometheus`；只有 `/actuator/health`、`/metrics` 可用 | 补依赖，或删掉该配置项 |
+| 4 | 提前预订语义有限 | `availableBeds` 是"此刻可分配床位数"，不校验未来日期区间冲突 | 增加 `bed_occupancy(bed_id, date_from, date_to)` 区间表与唯一约束 |
+| 5 | 审计异步写不参与事务 | `AuditService` 用独立线程写库，业务回滚时可能留下假审计 | 改为 `@TransactionalEventListener(AFTER_COMMIT)`，或与业务同事务 |
+| 6 | `audit_log` 缺 `region_id` | 区域管理员看审计只能靠角色门禁，无法按列过滤 | 写入时固化 `region_id` |
+| 7 | 幂等键无 TTL 且全局唯一 | 同一键跨用户会冲突 | 改为 `(user_id, key)` 联合唯一 + TTL |
+| 8 | 停止生成只停本地推送 | 上游模型 HTTP 流仍在跑（LangChain4j 不暴露 abort 句柄），token 仍计费 | 换支持中断的客户端，或改为可 cancel 的异步任务 |
+| 9 | 长期记忆是模型自由文本 | 原样拼进 system prompt，未做不可信内容包裹 | 结构化字段 + 白名单 + 注入检测后再回灌 |
+| 10 | CORS 放得较宽 | 允许 `192.168.*` / `10.*` 任意来源且 `allowCredentials=true` | 收敛为配置白名单 |
+
+token 吊销、跨区越权、写路径 SQL 注入三项已于 2026-11 修复，改动见 `git log` 与 `docs/design-notes/`。
+
+### 10.4 领域与集成
 
 - **知识库制度文本是演示样例**（虚构内容），不是任何公司的真实制度；区域、公寓、价格为合成数据。
 - **AI 助手不接真实工单 / K8s / 发布系统**：写操作只写业务库，不触发外部系统。

@@ -18,4 +18,4 @@ bash scripts/start.sh          # 三服务
 ```
 
 > 录制时用的是真实的 `deepseek-v4.1-flash` 模型与 RAG 知识库，没有走 mock；
-> 无 Key 时助手会降级成离线 mock（README「已知限制」有说明），画面会不一样。
+> 无 Key 时助手会降级成离线 mock，画面与实际运行时不同。
