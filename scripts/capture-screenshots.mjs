@@ -917,7 +917,7 @@ async function captureAgent(page) {
     title: 'AI 助手对话 - 工具调用明细（入参 / 结果 / 耗时）',
     prepare: async (pg) => {
       await alignEvidenceTop(pg)
-      // 展开一两条入参，证明工具真的带业务参数
+      // 展开一两条入参，便于核对工具的业务参数
       const expanders = pg.locator('[data-test="tool-block"] .tool-card-args-head').first()
       if (await expanders.count()) {
         await expanders.click({ trial: false }).catch(() => {})
@@ -1350,23 +1350,23 @@ print(json.dumps({
 /*  5. manifest.md                                                       */
 /* ==================================================================== */
 const MANIFEST_ITEMS = [
-  ['01-login.png', '/login（未登录）', '登录页：三服务一键启动后的统一入口，含测试账号提示与品牌信息。'],
-  ['02-rooms.png', '/rooms（zhangwei 员工端）', '房源查询：按区域/日期/房型过滤，直接展示房态、可订床位数与预估总价。'],
-  ['03-apply-form.png', '/apply/create（已填好、未提交）', '提交入住申请：四步流程条 + 晚数与预估总价实时计算 + 幂等键防重复提交设计。'],
-  ['04-my-applies.png', '/apply/mine（zhangwei）', '我的申请：同一员工覆盖待审批/已通过/已入住/已退房/已驳回的完整状态流转。'],
-  ['05-admin-approve.png', '/admin/approve（superadmin）', '申请审批：管理员视角的申请池（清掉默认「待审批」过滤，10 行覆盖待审批/已通过/已入住/已退房/已驳回），操作列按状态给出审批分房/驳回/换房动作。'],
-  ['05b-approve-dialog.png', '/admin/approve → 审批分房弹窗', '审批分房：按申请区域与日期过滤可订房间，右侧实时显示床位占用，选床后一次事务落库。'],
-  ['06-admin-orders.png', '/admin/orders（superadmin）', '订单管理：申请审批入库自动生成订单，含入住人、房间床位、金额币种、实际入住退房与状态。'],
-  ['07-dashboard.png', '/admin/dashboard（superadmin）', '统计看板：入住率仪表盘、申请状态分布、近 14 天趋势、各区域房源分布四张 ECharts 实测渲染。'],
-  ['08-agent-chat.png', '/agent（zhangwei，真实提问）', 'AI 助手：一屏同时看到「工具调用卡片 + 流式回答 + RAG 引用来源」，回答可点开引用溯源。'],
-  ['08b-agent-tools.png', '/agent（同一轮对话，滚到工具调用区）', '工具调用明细：每个工具的名称、业务入参（区域/城市/房型）与返回结果，证明回答来自真实业务接口而不是模型编造。'],
-  ['08c-agent-refs.png', '/agent（同一轮对话，滚到回答尾部）', '引用溯源：回答尾部的「参考来源」chip 列表 + 耗时/首字耗时/tokens/模型元信息，说明每个结论都能回到知识库原文。'],
-  ['09-agent-ops.png', '/admin/agent-ops → 工具清单（superadmin）', 'Agent 运营看板：20 个只读工具 + 5 个写工具、读写分离、已装配 Agent（APPLY#EMPLOYEE / POLICY#EMPLOYEE / ROOM#EMPLOYEE）与单轮超时，回答「Agent 到底能做什么、有没有危险动作」。'],
-  ['09b-agent-rag.png', '/admin/agent-ops → RAG 质量', 'RAG 质量：无命中率、平均最高相似度、点踩率、平均检索耗时与缺口问题榜——回答「知识库到底够不够用」。'],
-  ['09c-agent-models.png', '/admin/agent-ops → 模型健康状态', '模型健康：主模型 / 快速 / 两级 fallback 的可用性、成功率、连续失败与熔断剩余，外加限流与助手清单。'],
-  ['10-audits.png', '/admin/audits（superadmin）', '审计日志：谁在什么时候对哪条数据做了什么、结果与耗时，含 traceId 可串起整条调用链。'],
-  ['11-swagger.png', 'http://127.0.0.1:8081/swagger-ui.html', '接口文档：业务服务的 OpenAPI，说明接口契约与统一响应包装。'],
-  ['agent-stream.gif', '/agent 提问后的流式过程（约 11s，1000px 宽，1.3MB）', '动态证明：回答是逐字流式输出（SSE）而非一次性返回，同时可看到工具调用与引用逐步出现。'],
+  ['01-login.png', '/login（未登录）', '登录页，含测试账号提示。'],
+  ['02-rooms.png', '/rooms（zhangwei 员工端）', '房源查询，支持按区域 / 日期 / 房型过滤，显示房态、可订床位数与预估总价。'],
+  ['03-apply-form.png', '/apply/create（已填好、未提交）', '提交入住申请，含四步流程条、晚数与预估总价实时计算。'],
+  ['04-my-applies.png', '/apply/mine（zhangwei）', '我的申请，覆盖待审批 / 已通过 / 已入住 / 已退房 / 已驳回各状态。'],
+  ['05-admin-approve.png', '/admin/approve（superadmin）', '申请审批，管理员视角的申请池；操作列按状态提供审批分房 / 驳回 / 换房。'],
+  ['05b-approve-dialog.png', '/admin/approve → 审批分房弹窗', '审批分房弹窗，按区域与日期过滤可订房间，右侧显示床位占用。'],
+  ['06-admin-orders.png', '/admin/orders（superadmin）', '订单管理，含入住人、房间床位、金额币种、实际入住退房时间与状态。'],
+  ['07-dashboard.png', '/admin/dashboard（superadmin）', '统计看板，含入住率、申请状态分布、近 14 天趋势与区域房源分布四张图表。'],
+  ['08-agent-chat.png', '/agent（zhangwei，真实提问）', 'AI 助手，同屏显示工具调用卡片、流式回答与引用来源。'],
+  ['08b-agent-tools.png', '/agent（同一轮对话，滚到工具调用区）', '工具调用明细，含工具名称、业务入参（区域 / 城市 / 房型）与返回结果。'],
+  ['08c-agent-refs.png', '/agent（同一轮对话，滚到回答尾部）', '引用来源列表，含耗时、首字耗时、tokens 与模型信息。'],
+  ['09-agent-ops.png', '/admin/agent-ops → 工具清单（superadmin）', 'Agent 运营看板的工具清单，含 20 个只读工具、5 个写工具与已装配 Agent。'],
+  ['09b-agent-rag.png', '/admin/agent-ops → RAG 质量', 'RAG 质量页，含无命中率、平均最高相似度、点踩率与检索耗时。'],
+  ['09c-agent-models.png', '/admin/agent-ops → 模型健康状态', '模型健康页，含主模型与两级 fallback 的可用性、成功率、连续失败与熔断状态。'],
+  ['10-audits.png', '/admin/audits（superadmin）', '审计日志，含操作人、对象、结果、耗时与 traceId。'],
+  ['11-swagger.png', 'http://127.0.0.1:8081/swagger-ui.html', '业务服务的 OpenAPI 文档。'],
+  ['agent-stream.gif', '/agent 提问后的流式过程（约 11s，1000px 宽，1.3MB）', 'AI 助手流式回答过程，工具调用与引用逐步出现。'],
 ]
 
 async function writeManifest() {
@@ -1375,10 +1375,10 @@ async function writeManifest() {
     const hit = results.find((r) => r.file === file)
     let state
     if (hit) {
-      state = hit.ok ? '✅ 本次采集通过校验' : '⚠️ 本次未通过校验（失败样本见 `.work/capture/rejected-*`）'
+      state = hit.ok ? '本次采集通过校验' : '本次未通过校验（失败样本见 `.work/capture/rejected-*`）'
     } else {
       const size = await fs.stat(path.join(OUT, file)).then((st) => st.size).catch(() => 0)
-      state = size ? `✅ 已采集（${(size / 1024).toFixed(0)}KB）` : '— 缺失'
+      state = size ? `已采集（${(size / 1024).toFixed(0)}KB）` : '缺失'
     }
     rows.push(`| \`${file}\` | ${page} | ${prove} | ${state} |`)
   }
@@ -1411,7 +1411,7 @@ ${gifLine}
 
 ## 清单
 
-| 文件 | 页面 | 这张图证明什么 | 本次采集 |
+| 文件 | 页面 | 内容 | 状态 |
 | --- | --- | --- | --- |
 ${list}
 

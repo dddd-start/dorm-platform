@@ -114,9 +114,9 @@ docker compose -f deploy/docker-compose.yml up --build
 种子数据在 `dorm-service/src/main/resources/db/migration/V2__seed_data.sql`；
 `deploy/mysql-init/` 负责首次建库建账号，`ui-service/deploy/nginx.conf` 负责反代与 SSE 不缓冲。
 
-> ⚠️ **仅限本机/内网演示**：`deploy/docker-compose.yml` 里的数据库口令、JWT secret、
-> 内部服务令牌、手机号加密 key 都是**开发用固定值**，且服务默认监听 `0.0.0.0`。
-> 上公网前必须全部换成环境变量注入，并收敛监听地址与 CORS 白名单（见「已知限制」第 1、10 条）。
+> 注意：`deploy/docker-compose.yml` 中的数据库口令、JWT secret、内部服务令牌与手机号加密 key
+> 均为开发用固定值，服务默认监听 `0.0.0.0`。部署到公网前需改为环境变量注入，
+> 并收敛监听地址与 CORS 白名单，详见「十一、已知限制」第 1、10 条。
 
 ### 演示账号（种子数据）
 
