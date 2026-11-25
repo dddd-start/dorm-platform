@@ -17,19 +17,17 @@ import java.util.stream.Stream;
 /**
  * 真实知识库的离线语料夹具：把 {@code agent-service/src/main/resources/knowledge/*.md} 读进来。
  *
- * <h3>为什么不用生产那条加载链</h3>
  * 生产的知识库加载是 {@code KnowledgeBaseLoader}：它要 Spring 上下文、MySQL、Redis
  * 和嵌入缓存，启动一次几十秒。但"切分得对不对、检索得准不准"这些问题
- * <b>根本不需要数据库</b> —— 它们只依赖文本、分块参数和嵌入模型。
+ * <b>根本不需要数据库</b>，它们只依赖文本、分块参数和嵌入模型。
  *
  * <p>于是本夹具把那条链里<b>与存储无关</b>的部分单独拎出来：
  * 读文件 → 解析 front-matter → 交给我方的 {@link MarkdownChunker}。
  * 用的是<b>真实文档、真实参数、真实分块器</b>，只是不落库。
- * 代价是它不覆盖"版本门控重建索引"这类存储侧行为 —— 那些留给需要数据库的加餐。
+ * 代价是它不覆盖"版本门控重建索引"这类存储侧行为，那些留给需要数据库的加餐。
  *
- * <h3>为什么放在 support 包</h3>
  * 第 06 章用它验证切分不变量，第 07 章用它做检索评测。
- * 共享夹具放在这里，而不是各写一份 —— 两份会漂移，而漂移的语料
+ * 共享夹具放在这里，而不是各写一份，两份会漂移，而漂移的语料
  * 会让两章的数字互相矛盾。
  */
 public final class KnowledgeTestCorpus {
@@ -69,7 +67,7 @@ public final class KnowledgeTestCorpus {
      *
      * <p>从当前工作目录向上找 {@code agent-service/src/main/resources/knowledge}。
      * 不写死相对路径（{@code ../dorm-boot/...}）是因为测试的工作目录
-     * 取决于从哪里调用 Maven —— 写死会在某些调用方式下悄悄找不到文件，
+     * 取决于从哪里调用 Maven，写死会在某些调用方式下悄悄找不到文件，
      * 而"悄悄找不到"在这里等于"测试什么也没验证"。
      */
     public static Path knowledgeDir() {

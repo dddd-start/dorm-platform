@@ -53,7 +53,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * 业务服务客户端 —— Agent 服务访问业务数据的唯一入口。
+ * 业务服务客户端，Agent 服务访问业务数据的唯一入口。
  *
  * <p>设计原则：
  * <ul>
@@ -336,7 +336,7 @@ public class DormServiceClient {
      * 若业务服务网络异常，同步 HTTP 会把“用户看到结束”的时间拖到超时之后。
      * 审计是尽力而为的观测数据，不能反过来决定对话何时结束。
      *
-     * <p>令牌/链路上下文在提交时捕获 —— 异步线程不会继承 ThreadLocal。
+     * <p>令牌/链路上下文在提交时捕获，异步线程不会继承 ThreadLocal。
      */
     public void audit(boolean success, AuditEnums.Module module, String action,
                       String targetType, Object targetId, String errorMsg,

@@ -9,8 +9,7 @@ import jakarta.validation.constraints.Size;
  * @param conversationId 会话 ID；为空表示新建会话
  * @param turnId         客户端轮次幂等键。前端在<b>生成前</b>生成，
  *                       重试/重连时带上同一个值：服务端据此判断"这一轮已经答过了"，
- *                       直接重放既有回答而不是重新调用模型 ——
- *                       既保证语义一致，也避免用户为一次提问付两次费用。
+ *                       直接重放既有回答而不是重新调用模型，*                       既保证语义一致，也避免用户为一次提问付两次费用。
  * @param message        用户消息
  */
 public record AgentChatRequest(

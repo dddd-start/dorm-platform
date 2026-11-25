@@ -12,8 +12,8 @@ import java.util.concurrent.ThreadPoolExecutor;
  *
  * <p>每个池的拒绝策略都是刻意选的，不是默认值：
  * <ul>
- *   <li><b>auditExecutor</b>：队列满时 CallerRuns —— 审计宁可拖慢调用方也不能丢；</li>
- *   <li><b>outboxExecutor</b>：CallerRuns —— 事件投递不允许丢。</li>
+ *   <li><b>auditExecutor</b>：队列满时 CallerRuns，审计宁可拖慢调用方也不能丢；</li>
+ *   <li><b>outboxExecutor</b>：CallerRuns，事件投递不允许丢。</li>
  * </ul>
  * 这几个池是「高并发下不雪崩」的关键：没有隔离，一个慢依赖就能拖垮全站。
  */
@@ -24,8 +24,7 @@ public class ExecutorConfig {
     /**
      * 丢弃并计数的拒绝策略。
      *
-     * <p>为什么不用 DiscardPolicy：那个策略是**静默**丢弃，出问题时没有任何痕迹 ——
-     * 而"观测数据被丢了"这件事本身必须可见，否则运维会以为审计是完整的。
+     * <p>为什么不用 DiscardPolicy：那个策略是静默丢弃，出问题时没有任何痕迹，* 而"观测数据被丢了"这件事本身必须可见，否则运维会以为审计是完整的。
      * 这里把丢弃次数暴露到日志（按 1000 条聚合一次，避免刷屏）。
      */
     static final class CountingDiscardHandler implements java.util.concurrent.RejectedExecutionHandler {
@@ -60,7 +59,7 @@ public class ExecutorConfig {
         executor.setQueueCapacity(2000);
         executor.setThreadNamePrefix("dorm-audit-");
         // 【为什么从 CallerRunsPolicy 改为 DiscardPolicy + 计数】
-        // CallerRunsPolicy 在队列满时会把审计写入**放到调用者线程**上执行 ——
+        // CallerRunsPolicy 在队列满时会把审计写入放到调用者线程上执行 ——
         // 而调用者通常是模型回调线程（关键路径）。1000 并发下每轮产生若干条
         // 工具调用审计，队列一旦打满，审计写库就直接与业务请求抢数据库连接，
         // 实测出现 total=128/active=128/waiting=192 的连接耗尽。

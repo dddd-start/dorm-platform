@@ -37,14 +37,13 @@ import java.util.List;
  * <p>其中 {@code /api/rooms/availability} 是员工与 AI 助手查房的核心接口。
  *
  * <p><b>可订口径（H8/H9 修复后）</b>：{@code availableBeds} 表示<b>此刻真正能被分配</b>
- * 的床位数，与审批写路径 {@code occupyBed(WHERE status='IDLE')} 完全一致 ——
- * 因此"接口说可订"等价于"审批一定能分配成功"，前端据此启用预订按钮是安全的。
+ * 的床位数，与审批写路径 {@code occupyBed(WHERE status='IDLE')} 完全一致，* 因此"接口说可订"等价于"审批一定能分配成功"，前端据此启用预订按钮是安全的。
  *
  * <p>日期参数用于确定入住窗口，并额外给出 {@code bookableBeds}（该区间内<b>时间上</b>
  * 不冲突的床位数，表示"届时会有房"）。它<b>不代表此刻可分配</b>：
  * 一张当前被占用、对方下个月退房的床会算进 {@code bookableBeds}，
  * 但走审批时会被 {@code occupyBed} 拒绝。旧实现把两者混为一谈，
- * 实测出现 76（宣称可订）vs 59（真能分配）的落差 —— 详见 {@code DormRoomMapper.xml}。
+ * 实测出现 76（宣称可订）vs 59（真能分配）的落差，详见 {@code DormRoomMapper.xml}。
  */
 @Tag(name = "05-房间与床位", description = "房源维护、可用性检索、床位管理")
 @RestController

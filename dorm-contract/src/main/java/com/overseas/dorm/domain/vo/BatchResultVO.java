@@ -7,8 +7,6 @@ import java.util.List;
  * 批量操作结果。
  *
  * <p>批量接口（批量开关房、批量启停床位）必须逐条返回成功与失败原因，
- * 而不是"整体成功/失败" —— 否则用户面对 20 个房间时会不知道哪几间没生效。
- * 因此这里用一个固定形状的结果对象，而不是 {@code Map} 里塞一堆动态 key。
  */
 public record BatchResultVO(
         int successCount,

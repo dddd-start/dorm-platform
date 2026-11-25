@@ -5,8 +5,7 @@ import lombok.Getter;
 /**
  * 知识库文档状态。
  *
- * <p>只有 {@link #PUBLISHED} 的文档会被向量化并参与检索 ——
- * 这条规则同时出现在索引装载与检索 SQL 里，用枚举可以避免两边写成不同的字符串。
+ * <p>只有 {@link #PUBLISHED} 的文档会被向量化并参与检索，* 这条规则同时出现在索引装载与检索 SQL 里，用枚举可以避免两边写成不同的字符串。
  */
 @Getter
 public enum DocumentStatus {

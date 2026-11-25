@@ -18,9 +18,9 @@ import java.time.LocalDateTime;
  *
  * <p>敏感信息处理：手机号<b>不落明文</b>。
  * <ul>
- *   <li>{@code phoneCipher} —— AES-GCM 密文，仅在需要向本人展示/编辑时解密；</li>
- *   <li>{@code phoneMask} —— 掩码（138****8000），列表页与 AI Prompt 只用它；</li>
- *   <li>{@code phoneHash} —— HMAC-SHA256 摘要，用于按手机号精确查询。</li>
+ *   <li>{@code phoneCipher}，AES-GCM 密文，仅在需要向本人展示/编辑时解密；</li>
+ *   <li>{@code phoneMask}，掩码（138****8000），列表页与 AI Prompt 只用它；</li>
+ *   <li>{@code phoneHash}，HMAC-SHA256 摘要，用于按手机号精确查询。</li>
  * </ul>
  */
 @Data

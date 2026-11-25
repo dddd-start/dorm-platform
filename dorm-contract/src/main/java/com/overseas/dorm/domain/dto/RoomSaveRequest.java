@@ -13,8 +13,7 @@ import java.math.BigDecimal;
 /**
  * 房间新增/编辑。
  *
- * <p>床位数量由房型决定（见 {@code RoomService}），前端不要直接传 capacity ——
- * 否则会出现「房型是单人间却有 4 张床」这种自相矛盾的数据。
+ * <p>床位数量由房型决定（见 {@code RoomService}），前端不要直接传 capacity，* 否则会出现「房型是单人间却有 4 张床」这种自相矛盾的数据。
  */
 public record RoomSaveRequest(
         Long id,

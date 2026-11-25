@@ -11,8 +11,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  *
  * <p>向量以 float32 小端字节序存进 MEDIUMBLOB。这里最需要守住的是
  * <b>字节序一致性</b>：如果编码用大端、解码用小端（或跨机器迁移时不一致），
- * 得到的不再是报错，而是一堆"看起来正常但完全错误"的浮点数 ——
- * 检索结果会莫名其妙地全错，且没有任何异常提示。
+ * 得到的不再是报错，而是一堆"看起来正常但完全错误"的浮点数，* 检索结果会莫名其妙地全错，且没有任何异常提示。
  */
 class VectorCodecTest {
 

@@ -17,7 +17,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
- * 入住申请 —— 系统的核心业务单据。
+ * 入住申请，系统的核心业务单据。
  *
  * <p>生命周期见 {@code ApplyStateMachine}。几个关键字段的用途：
  * <ul>

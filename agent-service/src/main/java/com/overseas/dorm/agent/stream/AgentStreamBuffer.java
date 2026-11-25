@@ -27,41 +27,20 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
 /**
- * 流式事件缓冲与广播 —— 「断点续打」的地基。
+ * 流式事件缓冲与广播（断点续传的存储层）。
  *
- * <h3>要解决的问题</h3>
- * SSE 是"服务器推、客户端收"的单向连接。网络一抖、手机切后台、
- * 用户刷新页面，连接就断了，而此刻模型可能已经生成了半句话。
- * 传统做法是"断了就重新问一遍"—— 既浪费 token，又会出现内容重复或丢失。
- *
- * <h3>方案：每个事件都有序号，写进 Redis Stream</h3>
  * <pre>
- *   生成方：每个 token/事件 → 分配单调递增 seq → XADD 到 dorm:stream:{messageId}
- *                         → 同时 PUBLISH 到 dorm:stream:live:{messageId}
- *   消费方：正常时从 Pub/Sub 实时收；重连时先 XRANGE 拉取 seq &gt; lastEventId 的历史，
- *          再订阅 Pub/Sub 接续，并按 seq 去重。
+ *   写入：每个事件分配单调递增 seq → XADD dorm:stream:{messageId}
+ *                                 → PUBLISH dorm:stream:live:{messageId}
+ *   读取：正常走 Pub/Sub 实时收；重连时先 XRANGE 拉 seq > lastEventId 的历史，
+ *         再订阅 Pub/Sub 接续，按 seq 去重。
  * </pre>
  *
- * <h3>为什么 Stream + Pub/Sub 两个都用，而不是只用其中一个</h3>
- * <table>
- *   <tr><th>只用 Pub/Sub</th>
- *       <td>断线期间的事件<b>永久丢失</b>（Pub/Sub 不存历史），无法续传</td></tr>
- *   <tr><th>只用 Stream</th>
- *       <td>需要轮询（XREAD BLOCK 会占用连接），实时性差，且每轮对话占用一个阻塞连接</td></tr>
- *   <tr><th>两者结合</th>
- *       <td>Stream 保历史（可靠），Pub/Sub 保实时（低延迟），<b>seq 保证两者交接处不重不漏</b></td></tr>
- * </table>
+ * <p>只用 Pub/Sub 无法续传（不存历史）；只用 Stream 需要轮询（XREAD BLOCK 占连接）。
+ * 两者结合由 seq 保证交接处不重不漏。
  *
- * <h3>内存保护</h3>
- * Stream 用 {@code MAXLEN ~ N} 做近似裁剪：单条流最多保留 N 条事件。
- * 不裁剪的话，一个生成 4000 token 的对话会在 Redis 里留下几千条记录，
- * 上千并发流就是百万级 key 的堆积 —— 这是"高并发 SSE 导致内存溢出"的典型成因。
- * 同时给 key 设置 TTL：对话结束后保留一段可重连窗口，之后自动清理。
- *
- * <h3>多实例部署</h3>
- * 因为缓冲在 Redis 而不是 JVM 内存里，用户在实例 A 发起对话、
- * 断线后重连落到实例 B，依然能从 Stream 里读到完整历史并继续接收 ——
- * 无需粘性会话（sticky session）。这是"无状态水平扩展"的关键前提。
+ * <p>Stream 用 {@code MAXLEN ~ N} 近似裁剪，并设 TTL：单条流最多保留 N 条事件，
+ * 避免长对话与高并发场景下 Redis key 无限堆积。可重连窗口见 {@code stream.ttl}。
  */
 @Slf4j
 @Component
@@ -76,7 +55,7 @@ public class AgentStreamBuffer {
      * 本实例内每个 messageId 的共享订阅（引用计数）。
      *
      * <p>存在的唯一目的：保证「一个频道一个监听器」。
-     * 详见 {@link #subscribe(Long, Consumer)} 的说明 —— 多条连接各订阅一次，
+     * 详见 {@link #subscribe(Long, Consumer)} 的说明，多条连接各订阅一次，
      * 会让监听容器在退订时踩到已失效的共享订阅连接（实测 HTTP 500）。
      */
     private final Map<Long, SharedSubscription> subscriptions = new ConcurrentHashMap<>();
@@ -86,8 +65,7 @@ public class AgentStreamBuffer {
      *
      * <p>容器的 add 与 remove 一旦交错，就可能出现"A 线程正在注册、B 线程把订阅连接
      * 关掉"的竞态；容器内部虽有锁，但它保护不了"我们先读状态、容器后变更"这种跨调用
-     * 的窗口。用应用层的一把锁把区间收口，代价是注册/退订变成串行 ——
-     * 这只发生在"某条流的第一条连接接入 / 最后一条连接离开"的瞬间，量级是每秒几次。
+     * 的窗口。用应用层的一把锁把区间收口，代价是注册/退订变成串行，* 这只发生在"某条流的第一条连接接入 / 最后一条连接离开"的瞬间，量级是每秒几次。
      */
     private final ReentrantLock listenerLock = new ReentrantLock();
 
@@ -110,7 +88,7 @@ public class AgentStreamBuffer {
      *
      * <p>放在自身的 {@code @PostConstruct} 而不是外部 Config 类里，
      * 是为了避免"配置类注入 Buffer、Buffer 又注入配置类定义的监听容器"
-     * 造成的循环依赖 —— 循环依赖在启动时才暴露，而且报错信息很难指向根因。
+     * 造成的循环依赖，循环依赖在启动时才暴露，而且报错信息很难指向根因。
      */
     @jakarta.annotation.PostConstruct
     public void initFromProperties() {
@@ -227,7 +205,7 @@ public class AgentStreamBuffer {
      * <p>用 {@link StreamState} 枚举而不是字符串：这个值决定"重连时该补历史还是接实时流"，
      * 而且同时被三处使用（Redis 读写、终态判定、审计）。此前三处各写各的字符串字面量，
      * 一旦有人把 {@code DONE} 写成 {@code COMPLETED}，后果是<b>重连永远认为还在生成中</b>，
-     * 客户端会一直等到超时 —— 而日志里没有任何报错。
+     * 客户端会一直等到超时，而日志里没有任何报错。
      */
     public void setState(Long messageId, StreamState state) {
         try {
@@ -255,7 +233,7 @@ public class AgentStreamBuffer {
      * 某个 SSE 事件名是否代表"这一轮结束了"。
      *
      * <p>刻意与 {@link #isTerminal(StreamState)} 分开而不是重载同名方法：
-     * 两者判断的是不同的东西 —— 一个是<b>事件</b>（DONE/ERROR/BLOCKED/INTERRUPTED），
+     * 两者判断的是不同的东西，一个是<b>事件</b>（DONE/ERROR/BLOCKED/INTERRUPTED），
      * 一个是<b>流状态</b>（含 GENERATING）。同名重载会让调用方很容易传错参数，
      * 而这两者传错的后果（重连时提前关闭连接）非常隐蔽。
      */
@@ -300,14 +278,12 @@ public class AgentStreamBuffer {
     // ------------------------------------------------------------------ 本实例内订阅
 
     /**
-     * 订阅某条流的实时事件（**每个 messageId 在本实例内共享一份监听器，引用计数管理**）。
+     * 订阅某条流的实时事件（每个 messageId 在本实例内共享一份监听器，引用计数管理）。
      *
-     * <p>统一走 Redis Pub/Sub，因此无论是本实例还是其它实例产生的 token 都能收到。
      * 返回的 {@link AutoCloseable} 必须在连接结束时关闭，
-     * 否则会造成监听器泄漏 —— 每个泄漏都是对 Redis 连接与内存的持续占用，
+     * 否则会造成监听器泄漏，每个泄漏都是对 Redis 连接与内存的持续占用，
      * 在高并发下会逐步把服务拖垮。
      *
-     * <h3>为什么一个 messageId 只能注册一个监听器（H3/H4 的核心）</h3>
      * 原实现是"每条连接各订阅一次、关闭即退订"。当同一个 messageId 上同时存在多条
      * 连接（断线续传 + 正在生成的原连接，或多条并发续传）时，会产生两类问题：
      * <ol>
@@ -324,10 +300,8 @@ public class AgentStreamBuffer {
      * 改成"每个 messageId 一份共享订阅 + 引用计数，最后一条连接关闭才真正退订"后，
      * 容器看到的永远是「一个频道一个监听器」，与单连接时代的行为一致。
      *
-     * <h3>并发安全</h3>
      * 创建/注册/退订都在 {@link SharedSubscription} 自身的监视器下完成，
-     * 并保证「注销最后一个订阅者」与「从注册表移除」是同一个原子步骤 ——
-     * 否则新订阅者可能拿到一份刚被标记回收的共享订阅，造成监听器泄漏或
+     * 并保证「注销最后一个订阅者」与「从注册表移除」是同一个原子步骤，* 否则新订阅者可能拿到一份刚被标记回收的共享订阅，造成监听器泄漏或
      * 同一频道出现两个监听器（正是要避免的情形）。
      */
     public AutoCloseable subscribe(Long messageId, Consumer<StreamEvent> consumer) {
@@ -377,14 +351,14 @@ public class AgentStreamBuffer {
     /**
      * 注册共享监听器。
      *
-     * <p>所有对监听容器的**变更**（注册/退订/重建）都在同一把锁下串行执行：
+     * <p>所有对监听容器的变更（注册/退订/重建）都在同一把锁下串行执行：
      * 让容器的 add 与 remove 交错，正是上面那类"踩到已失效订阅"的温床。
      *
-     * <p>注册失败时做一次**自愈**：监听容器的全部订阅共享同一条 Redis 订阅连接，
+     * <p>注册失败时做一次自愈：监听容器的全部订阅共享同一条 Redis 订阅连接，
      * 一旦它被判定失效，后续注册都会抛 {@code RedisInvalidSubscriptionException}，
      * 而该实例将再也收不到任何实时事件（客户端只能拿到历史然后干等）。
      * {@code stop()} 会关闭旧连接并把订阅状态复位，{@code start()} 会按容器内部
-     * 的 channelMapping 把**包括本条在内的所有频道**重新订阅一遍。
+     * 的 channelMapping 把包括本条在内的所有频道重新订阅一遍。
      */
     private void register(SharedSubscription shared) {
         listenerLock.lock();
@@ -433,7 +407,7 @@ public class AgentStreamBuffer {
     /**
      * 重建监听容器的订阅连接（自愈）。
      *
-     * <p>只允许在持有 {@link #listenerLock} 时调用 —— 它是"注册失败之后的补救动作"，
+     * <p>只允许在持有 {@link #listenerLock} 时调用，它是"注册失败之后的补救动作"，
      * 必须与其它注册/退订互斥，否则会出现"刚重建好又被别人拆掉"的振荡。
      */
     private void rebuildListenerContainer() {
@@ -502,7 +476,6 @@ public class AgentStreamBuffer {
     /**
      * 登记"有客户端正在接收这条流"，并刷新存活时间。
      *
-     * <h3>为什么这个计数必须放在 Redis 而不是 JVM 内存</h3>
      * 生成方需要判断"还有没有人在接收这条流"：如果没人接收，就应该及时中止生成
      * （避免为一个已经离开的用户持续烧模型额度）。这个判断在单实例下用一个
      * 内存计数器就够了，但多实例部署时会失效：
@@ -527,7 +500,7 @@ public class AgentStreamBuffer {
             // 用 Set + SCARD 计数，而不是"每订阅者一个键 + KEYS 匹配"。
             //
             // 【为什么必须改】原实现用 `redis.keys(prefix + "*")` 统计人数。
-            // Redis 是单线程的，KEYS 会**阻塞整个实例**并扫描全库：
+            // Redis 是单线程的，KEYS 会阻塞整个实例并扫描全库：
             // 1000 并发时看门狗每 5 秒对每个断线消息各调一次，
             // 足以把所有请求串行化 —— 实测 1000 并发下完成延迟 P50 高达 14 秒，
             // 而 30 并发时只有 3.4 秒，这个差异就是被 KEYS 拖掉的。
@@ -544,7 +517,7 @@ public class AgentStreamBuffer {
      * 刷新订阅者存活时间（心跳时调用，保证"人还在"这个事实不会过期）。
      *
      * <p>续期的是整个订阅集合键，EXPIRE 对所有成员同时生效，因此不需要
-     * subscriberId 参数 —— 原参数从未被使用，反而让调用方误以为它参与续期。
+     * subscriberId 参数，原参数从未被使用，反而让调用方误以为它参与续期。
      */
     public void touchSubscriber(Long messageId, Duration ttl) {
         try {

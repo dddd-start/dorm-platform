@@ -19,36 +19,21 @@ import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * 用量聚合的写后置缓冲（write-behind buffer）—— 用架构手段绕开硬件写入瓶颈。
+ * 用量聚合的写后置缓冲（write-behind）。
  *
- * <h2>要解决的瓶颈（实测）</h2>
- * 本机存储只有 <b>26 次 fsync/秒</b>（每次 38ms），而 MySQL 是完全持久化配置
+ * <p>本机存储约 26 次 fsync/秒，而 MySQL 为完全持久化配置
  * （{@code innodb_flush_log_at_trx_commit=1} + {@code sync_binlog=1}），
- * 因此**每一次事务提交都要 2 次 fsync**。改造前每轮对话有 6~7 次提交，
- * 1000 并发下就是上万次 fsync —— 物理上不可能在十几秒内完成。
+ * 每次事务提交要 2 次 fsync。改造前每轮对话 6~7 次提交，高并发下 fsync 数量物理上不可行。
  *
- * <h2>架构手段：把同步写库换成"内存聚合 + 批量落库"</h2>
  * <pre>
- *   每轮结束 ──HINCRBY──▶ Redis Hash (dorm:usage:buf:{date}:{userId})
- *                          · 0 次 fsync、1 次 RTT、无行锁
- *                                  │  每 5 秒 / 退出前
- *                                  ▼
- *                       批量 UPSERT 到 agent_usage_daily
- *                       （同一用户同一天的增量合并成一次提交）
+ *   每轮结束 → HINCRBY Redis Hash (dorm:usage:buf:{date}:{userId})
+ *            → 每 5 秒 / 退出前批量 UPSERT 到 agent_usage_daily
  * </pre>
- * 提交数从"每轮一次"降到"每刷新周期每用户一次"，即 <b>1~2 个数量级</b>的下降。
+ * 提交数从"每轮一次"降为"每刷新周期每用户一次"。
  *
- * <h2>为什么它可以写后置，而消息不行</h2>
- * 用量是**纯聚合数据**：只被看板/报表读取，不在任何请求的关键路径上，
- * 延迟落库不影响任何正确性判断。
- * 而消息会被同一用户的下一轮对话读取（上下文重建），必须同步可见 ——
- * 这是本组件与"消息写后置"的本质区别，也是后者的复杂度所在
- * （需要读路径合并 + 崩溃回放）。
- *
- * <h2>为什么不丢数据</h2>
- * 缓冲在 <b>Redis 且开启 AOF</b>（本项目 {@code appendonly yes}），
- * 比进程内缓冲可靠：进程被 OOM Kill 后缓冲仍在，下个周期照常落库。
- * 另有 {@link #flushOnShutdown()} 在优雅停机时兜底。
+ * <p>用量是纯聚合数据，只被看板读取，不在请求关键路径上，延迟落库不影响正确性。
+ * 作为对比，消息会被下一轮对话读取（上下文重建），必须同步可见，不能同样后置。
+ * 缓冲放在 Redis 且开启 AOF，进程被 OOM Kill 后缓冲仍在。
  */
 @Slf4j
 @Component
@@ -89,7 +74,7 @@ public class UsageWriteBuffer {
     private final StringRedisTemplate redis;
     private final AgentUsageDailyMapper usageMapper;
 
-    /** 记一次用量：**纯 Redis 操作，不触碰数据库、不产生任何 fsync**。 */
+    /** 记一次用量：纯 Redis 操作，不触碰数据库、不产生任何 fsync。 */
     public void accumulate(Long userId, int promptTokens, int completionTokens,
                            int toolCalls, int ragHits, boolean blocked, boolean newConversation) {
         if (userId == null) {

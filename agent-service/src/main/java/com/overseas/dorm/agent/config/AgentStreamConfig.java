@@ -10,8 +10,7 @@ import org.springframework.data.redis.listener.RedisMessageListenerContainer;
  * 流式相关基础设施配置。
  *
  * <p>这里只保留 Pub/Sub 监听容器这一个 bean。
- * 注意<b>不要</b>在本类里注入并配置 {@code AgentStreamBuffer} ——
- * 那会形成「Config 依赖 Buffer、Buffer 依赖本类定义的监听容器」的循环依赖，
+ * 注意<b>不要</b>在本类里注入并配置 {@code AgentStreamBuffer}，* 那会形成「Config 依赖 Buffer、Buffer 依赖本类定义的监听容器」的循环依赖，
  * 循环依赖只在启动时暴露，且 Spring 的报错信息很难直接指向根因。
  * Buffer 的配置改由它自己从 {@link AgentProperties} 读取（见其 @PostConstruct）。
  */
@@ -26,7 +25,7 @@ public class AgentStreamConfig {
      * <ul>
      *   <li>{@code setRecoveryInterval}：Redis 短暂抖动后容器会自动重连。
      *       如果设为 0（不恢复），一次网络闪断就会让所有实时推送永久失效，
-     *       而 SSE 连接看起来还"活着" —— 这是最难排查的一类故障；</li>
+     *       而 SSE 连接看起来还"活着"，这是最难排查的一类故障；</li>
      *   <li>不显式设置订阅线程池时 Spring 会给出一个默认实现，
      *       本项目的事件量级（每 token 一条消息）用默认池足够，
      *       若将来并发流上万，应显式给定线程池并监控其队列深度。</li>

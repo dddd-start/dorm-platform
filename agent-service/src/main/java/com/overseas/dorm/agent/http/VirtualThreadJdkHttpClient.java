@@ -26,43 +26,16 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * 把 LangChain4j 的流式 HTTP 读循环放到<b>专用虚拟线程</b>上的 HTTP 客户端。
+ * 把 LangChain4j 流式 HTTP 读循环放到专用虚拟线程上的客户端。
  *
- * <h3>为什么需要它（一个真实的容量陷阱）</h3>
- * LangChain4j 的 {@code OpenAiStreamingChatModel} 最终走
- * {@code JdkHttpClient.execute(...)}：它用
- * {@code HttpClient.sendAsync(...).thenAccept(resp -> parser.parse(resp.body(), listener))}
- * 读取 SSE。{@code thenAccept} 在“完成 future 的线程”上执行，而 JDK 把这条链交给
- * {@code CompletableFuture} 的默认执行器：
- * <ul>
- *   <li>{@code common.parallelism > 1} 时是 {@code ForkJoinPool.commonPool()}；</li>
- *   <li>{@code common.parallelism == 1}（典型 2 核容器）时退化成 thread-per-task；</li>
- *   <li>无论哪种，整个 SSE 读循环都占着这个线程，直到模型输出 {@code [DONE]}。</li>
- * </ul>
- * 结果是：聊天流的并发数不再由业务层的 {@code max-streams-global} /
- * {@code max-concurrent-calls} 决定，而由 JVM 的公共池决定；而且每 token 的
- * Redis 写、护栏、工具 HTTP 也都压在这个公共池线程上。这正是“30 并发看不出来、
- * 1000 并发把容器 hang 住”的来源之一。
+ * <p>背景：{@code OpenAiStreamingChatModel} 的读循环跑在
+ * {@code CompletableFuture} 的默认执行器上（{@code ForkJoinPool.commonPool()}，
+ * 或单核环境下退化为 thread-per-task），并持有该线程直到收到。
+ * 若不接管，聊天并发上限实际由 JVM 公共池决定，而非业务配置；
+ * 每 token 的 Redis 写、护栏、工具 HTTP 也会挤在同一批线程上。
  *
- * <h3>为什么是虚拟线程，而不是再开一个平台线程池</h3>
- * 流式读的绝大部分时间在等上游 token，属于阻塞 I/O。虚拟线程在
- * {@code InputStream.read()} 上会主动让出载体线程，1000 条流只需要很少的
- * 载体线程；平台线程池则会回到“每线程 1MB 栈”的老问题。
- *
- * <h3>为什么不用 {@code JdkHttpClient} 做流式</h3>
- * 它的流式实现走 {@code sendAsync().thenAccept(...)}，正好是我们要绕开的路径。
- * 这里改用同步的 {@code HttpClient.send(...)}，放在自己启动的虚拟线程里执行：
- * 读循环、SSE 解析、LangChain4j 回调都发生在这条虚拟线程上。
- * 非流式调用仍委托给 {@code JdkHttpClient}，保持与官方实现一致的行为
- * （错误映射、multipart、超时等）。
- *
- * <h3>取消/超时</h3>
- * {@link #execute(HttpRequest, ServerSentEventParser, ServerSentEventListener)}
- * 按接口约定立即返回，真正的读流在虚拟线程里。若上游长时间不产 token，
- * 读线程会阻塞到 HTTP 请求超时（{@code readTimeout}）为止；调用方（AgentTurnService）
- * 的 90 秒收口逻辑仍会先触发，但它无法强杀这条读线程 —— 这是与官方实现相同的
- * 取舍，后续若要支持“立即取消”，需要把 {@link InputStream} 暴露出来并在
- * abort 钩子里 close。
+ * <p>流式读的绝大部分时间在等上游 token，属于阻塞 I/O。虚拟线程在
+ * {@code InputStream.read()} 上会主动让出载体线程，因此千级流只需少量载体线程。
  */
 @Slf4j
 public final class VirtualThreadJdkHttpClient implements HttpClient, AutoCloseable {
@@ -231,8 +204,7 @@ public final class VirtualThreadJdkHttpClient implements HttpClient, AutoCloseab
      *
      * <p>{@code OpenAiClient} 会先读 {@code connectTimeout()/readTimeout()}，
      * 再调用 {@code build()}。这里返回的 client 已经在构造时固定了超时，
-     * 所以 builder 上的 setter 只做记录、不再二次修改共享 client ——
-     * 多个模型共用一个 client，避免互相覆盖。
+     * 所以 builder 上的 setter 只做记录、不再二次修改共享 client，* 多个模型共用一个 client，避免互相覆盖。
      */
     public HttpClientBuilder asBuilder() {
         return new SharedBuilder(this);

@@ -32,7 +32,7 @@ import java.util.function.Consumer;
  *   ❌ 事务提交后直接调用：进程在两步之间崩溃 -> 事件永久丢失
  *   ✅ Outbox: 事件先落库（和业务同一个原子操作），再由独立投递器保证"至少一次"
  * </pre>
- * 「至少一次」意味着消费端必须幂等 —— 这是分布式事务里无法回避的代价，
+ * 「至少一次」意味着消费端必须幂等，这是分布式事务里无法回避的代价，
  * 也是为什么本系统的业务操作都带幂等键。
  */
 @Slf4j
@@ -123,7 +123,7 @@ public class OutboxService {
         try {
             List<Consumer<OutboxEvent>> list = handlers.getOrDefault(event.getEventType(), List.of());
             if (list.isEmpty()) {
-                // 关键：没有处理器**绝不能**标记为"已投递"。
+                // 关键：没有处理器绝不能标记为"已投递"。
                 //
                 // 这曾经是一个真实缺陷：deliver() 遍历空的处理器列表，
                 // 循环体一次都不执行，于是事件被直接标记 SENT ——

@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * <p>为什么状态机值得单独写这么细的测试：
  * 它是全系统唯一被允许修改业务状态的入口。一旦状态机有洞，
  * 就会产生「已驳回却被入住」「已退房又占了床位」这类脏数据，
- * 而这些脏数据会污染房源统计、费用结算与审计追溯 —— 修复成本极高。
+ * 而这些脏数据会污染房源统计、费用结算与审计追溯，修复成本极高。
  */
 class ApplyStateMachineTest {
 

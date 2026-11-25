@@ -13,9 +13,9 @@ import java.lang.annotation.Target;
  *
  * <p>本系统有三层权限，各司其职，缺一不可：
  * <ol>
- *   <li><b>功能权限</b>（本注解）—— 能不能进这个接口（角色白名单）；</li>
- *   <li><b>数据权限</b>（{@code DataScope}）—— 进得来之后，能看到/改到哪些行；</li>
- *   <li><b>工具权限</b>（{@code ToolPermission}）—— AI 助手能不能替你调用某个能力。</li>
+ *   <li><b>功能权限</b>（本注解），能不能进这个接口（角色白名单）；</li>
+ *   <li><b>数据权限</b>（{@code DataScope}），进得来之后，能看到/改到哪些行；</li>
+ *   <li><b>工具权限</b>（{@code ToolPermission}），AI 助手能不能替你调用某个能力。</li>
  * </ol>
  *
  * <p>为什么三层都要有：只做功能权限会出现「区域管理员能改别的区域房间」的越权；

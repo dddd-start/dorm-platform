@@ -34,7 +34,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 入住申请接口 —— 全系统的业务主流程。
+ * 入住申请接口，全系统的业务主流程。
  *
  * <pre>
  *   员工：POST /api/applies            提交申请
@@ -152,7 +152,7 @@ public class ApplyController {
      *
      * <p>返回 {@code Map<String, Long>} 是<b>有意为之</b>：状态名是动态键
      * （由库里实际存在的状态决定），硬造固定字段会得到一堆永远为 0 的字段。
-     * 值类型已收紧为 {@code Long} —— 动态键用 Map 正确，"值为 Object"才是问题。
+     * 值类型已收紧为 {@code Long}，动态键用 Map 正确，"值为 Object"才是问题。
      * 键名与 {@code ApplyStatus} 枚举一致，并额外包含一个 {@code TOTAL} 项。
      */
     @Operation(summary = "申请状态统计")

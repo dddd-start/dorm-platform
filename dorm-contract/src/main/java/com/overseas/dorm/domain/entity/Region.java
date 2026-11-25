@@ -33,7 +33,7 @@ public class Region implements Serializable {
     private String nameEn;
     private String country;
     private String countryCode;
-    /** IANA 时区，如 Asia/Singapore —— 仅用于展示，存储统一 Asia/Shanghai。 */
+    /** IANA 时区，如 Asia/Singapore，仅用于展示，存储统一 Asia/Shanghai。 */
     private String timezone;
     private String currency;
     /** 区域管理员用户 ID。 */

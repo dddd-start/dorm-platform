@@ -19,12 +19,12 @@ import java.util.List;
 public interface DormBedMapper extends BaseMapper<DormBed> {
 
     /**
-     * 原子占用床位 —— 并发安全的最后一道防线。
+     * 原子占用床位，并发安全的最后一道防线。
      *
      * <p>{@code WHERE status = 'IDLE'} 这个条件让「检查-占用」合成一个原子操作：
      * 两个并发事务同时执行，只有一个能把 IDLE 改成 OCCUPIED，
      * 另一个影响行数为 0，业务层据此判定「床位已被抢走」并重新分配。
-     * 这比「先 SELECT 判断再 UPDATE」可靠得多 —— 后者是典型的竞态。
+     * 这比「先 SELECT 判断再 UPDATE」可靠得多，后者是典型的竞态。
      */
     @Update("""
             UPDATE dorm_bed

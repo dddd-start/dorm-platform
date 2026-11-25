@@ -36,18 +36,6 @@ import java.util.Map;
 /**
  * 知识库装载器：把 Markdown 文档变成可检索的向量切片。
  *
- * <h3>完整链路</h3>
- * <pre>
- *   classpath:knowledge/*.md
- *     → 解析 YAML front-matter（docCode/title/category/regionCode/version）
- *     → upsert 到 rag_document（文档版本 +1 才需要重建）
- *     → MarkdownChunker 按标题分块
- *     → EmbeddingModel（本地 ONNX）向量化，带 Redis 缓存
- *     → 写入 rag_chunk（向量以 float32 二进制存储）
- *     → 回写 indexed_version，并从库中重载内存索引
- * </pre>
- *
- * <h3>为什么用文件作为知识源的"唯一真相"</h3>
  * 知识内容用 Markdown 放在版本库里，而不是让人在后台富文本里编辑，有三个好处：
  * <ol>
  *   <li><b>可评审</b>：制度变更走代码评审流程，谁改了什么一目了然；</li>
@@ -57,10 +45,8 @@ import java.util.Map;
  * </ol>
  * 表里的 {@code rag_document} 只是这份真相的<b>索引与快照</b>。
  *
- * <h3>为什么只在版本变化时重建</h3>
  * 向量化是整个 RAG 链路里最贵的一步（本地 ONNX 也要几百毫秒/篇）。
  * 每次启动都全量重建会让启动时间白白增加几十秒。
- * 因此用 {@code version} 与 {@code indexed_version} 的比较来决定是否重建：
  * 改了内容就把 front-matter 里的 version +1。
  */
 @Slf4j
@@ -124,11 +110,10 @@ public class KnowledgeBaseLoader {
     /**
      * 全量重建：扫描文件、按需重新向量化、重载索引。
      *
-     * <h3>为什么用 TransactionTemplate 而不是 @Transactional</h3>
      * 这个方法有两条调用路径：
      * <ol>
-     *   <li>管理接口 {@code POST /api/agent/admin/knowledge/rebuild} —— 外部调用，代理生效；</li>
-     *   <li>启动监听 {@link #loadOnStartup} —— <b>类内自调用</b>，Spring 代理不参与，
+     *   <li>管理接口 {@code POST /api/agent/admin/knowledge/rebuild}，外部调用，代理生效；</li>
+     *   <li>启动监听 {@link #loadOnStartup}，<b>类内自调用</b>，Spring 代理不参与，
      *       {@code @Transactional} 会被完全忽略。</li>
      * </ol>
      * 也就是说，加了 {@code @Transactional} 反而会让人误以为启动重建是原子的，

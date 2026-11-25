@@ -30,7 +30,6 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Agent 注册表：把「专家 Agent 类型 × 角色」映射到装配好的 {@link DormAgent} 实例。
  *
- * <h3>多 Agent 协作的实现方式</h3>
  * 本系统采用「Supervisor + 专家」模式，而不是让一个巨型 Agent 处理所有事情：
  * <pre>
  *   用户消息
@@ -46,10 +45,8 @@ import java.util.concurrent.ConcurrentHashMap;
  *       （见 {@code dorm.agent.model.routing}）。</li>
  * </ol>
  *
- * <h3>为什么按角色再分一层缓存</h3>
  * 员工与管理员可用的工具集不同（管理员多一组运维工具）。
- * 与其在运行时判断"该不该挂这个工具"，不如在<b>装配期</b>就分好 ——
- * 员工角色的模型根本看不到运维工具的存在，从源头上消除了越权尝试的可能。
+ * 与其在运行时判断"该不该挂这个工具"，不如在<b>装配期</b>就分好，* 员工角色的模型根本看不到运维工具的存在，从源头上消除了越权尝试的可能。
  */
 @Slf4j
 @Component

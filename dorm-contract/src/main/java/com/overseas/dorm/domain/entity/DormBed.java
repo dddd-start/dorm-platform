@@ -12,7 +12,7 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
- * 床位 —— 并发分配的最小竞争单元。
+ * 床位，并发分配的最小竞争单元。
  *
  * <p>「同一张床被两个人同时抢到」是本系统唯一真正的高并发风险点，
  * 因此这里用<b>三道防线</b>叠加：

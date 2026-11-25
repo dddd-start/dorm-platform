@@ -38,8 +38,7 @@ import java.util.List;
  * <ul>
  *   <li>连续失败 {@code login-max-fail} 次后锁定 {@code login-lock-minutes} 分钟；</li>
  *   <li>失败计数同时写 Redis（快，用于判断）与数据库（持久，Redis 重启不丢）；</li>
- *   <li>账号不存在与密码错误返回<b>同一个</b>错误码 ——
- *       否则攻击者可以靠错误信息差异枚举出系统里有哪些账号。</li>
+ *   <li>账号不存在与密码错误返回<b>同一个</b>错误码，*       否则攻击者可以靠错误信息差异枚举出系统里有哪些账号。</li>
  * </ul>
  */
 @Slf4j
@@ -97,7 +96,7 @@ public class AuthService {
         redis.delete(RedisKeys.loginLock(user.getUsername()));
 
         // 认证版本：令牌里带上它，之后每个请求与 Redis 比对；
-        // 禁用/重置口令/角色或区域变更会递增它，从而让**已签发的**令牌立即失效。
+        // 禁用/重置口令/角色或区域变更会递增它，从而让已签发的令牌立即失效。
         long authEpoch = currentAuthEpoch(user.getId());
         String token = jwtTokenProvider.createToken(user, sessionId, authEpoch);
         // 会话白名单：支持"登出单个会话/强制下线"（按 (userId, sessionId) 精确删除）
@@ -151,7 +150,7 @@ public class AuthService {
      * 启动时给"上线前就已被禁用"的账号补一个认证墓碑。
      *
      * <p>为什么需要：epoch 机制是本次新增的。上线前被禁用的账号，其旧令牌里 epoch=0、
-     * Redis 里也没有 epoch 键（缺省也是 0）→ 两边相等，于是**旧令牌仍会放行**。
+     * Redis 里也没有 epoch 键（缺省也是 0）→ 两边相等，于是旧令牌仍会放行。
      * 这里在启动时把这些账号的 epoch 至少抬到 1，让它们的旧令牌立即失效。
      *
      * <p>用 {@code setIfAbsent} 而不是 {@code set}：绝不能把已经递增过的版本号降回去
@@ -185,7 +184,7 @@ public class AuthService {
      * 读取某用户当前的认证版本；键不存在时为 0。
      *
      * <p>为什么用"版本号"而不是"禁用标记"：
-     * 这一个机制同时覆盖了 4 类"变更必须立即生效"的场景 —— 禁用账号、重置口令、
+     * 这一个机制同时覆盖了 4 类"变更必须立即生效"的场景，禁用账号、重置口令、
      * 角色/区域变更、强制下线全部设备。若各写一个标记键，拦截器就要为每个场景各查一次 Redis；
      * 现在无论多少种吊销原因，请求路径上永远只是"比对同一个数字"。
      */
@@ -204,14 +203,14 @@ public class AuthService {
     }
 
     /**
-     * 吊销该用户的**全部**已签发令牌（递增认证版本）。
+     * 吊销该用户的全部已签发令牌（递增认证版本）。
      *
      * <p>用于：管理员禁用账号、重置口令、变更角色/区域、强制下线全部设备。
      * 为什么递增版本就能全部作废：拦截器要求"令牌里的 epoch == 当前 epoch"，
      * 递增之后所有旧令牌的 epoch 都落后，于是立即被拒（无需枚举、无需 SCAN、无竞态）。
      *
      * <p>本次不删会话白名单键：那些键带 TTL（= 令牌寿命），会自然过期；
-     * 即使它们还在，epoch 不匹配也会被拒 —— 两道校验都必须通过才放行。
+     * 即使它们还在，epoch 不匹配也会被拒，两道校验都必须通过才放行。
      */
     public void revokeAllSessions(Long userId) {
         Long epoch = redis.opsForValue().increment(RedisKeys.authEpoch(userId));
@@ -224,7 +223,7 @@ public class AuthService {
     }
 
     /**
-     * 校验令牌是否仍然有效：会话白名单 + 认证版本，**一次 Redis 往返**完成。
+     * 校验令牌是否仍然有效：会话白名单 + 认证版本，一次 Redis 往返完成。
      *
      * <p>用 {@code MGET} 同时取两个键（原本只有一个 {@code hasKey}，所以没有增加往返次数）：
      * <ul>
@@ -247,7 +246,7 @@ public class AuthService {
             values = redis.opsForValue().multiGet(List.of(
                     RedisKeys.session(userId, sessionId), RedisKeys.authEpoch(userId)));
         } catch (Exception e) {
-            // ③ Redis 不可用时**必须拒绝**，不能"读不到就放行" ——
+            // ③ Redis 不可用时必须拒绝，不能"读不到就放行" ——
             //    否则这里就成了一个新的 fail-open（拿不到版本号恰恰是最需要保守的时刻：
             //    Redis 挂了就无法判断该令牌是否已被吊销）。
             //    这里刻意只记 ERROR 不抛出：抛出去会被全局异常处理变成 500，
@@ -284,7 +283,7 @@ public class AuthService {
      * <p><b>【F3 修复】没有 sessionId 的令牌一律判为无效（fail-closed）。</b>
      *
      * <p>原实现是 {@code sessionId == null → return true}，即 fail-open：一个签名合法但
-     * 不带 {@code sid} 的令牌**永远无法被吊销** —— 登出删不掉它（没有键可删）、
+     * 不带 {@code sid} 的令牌永远无法被吊销，登出删不掉它（没有键可删）、
      * 禁用也拦不住它（会话校验直接放行）。实测：带正确签名但去掉 sid 的令牌
      * 可以一直访问 {@code /api/auth/ping}，管理员禁用账号后它照样能读能写。
      *

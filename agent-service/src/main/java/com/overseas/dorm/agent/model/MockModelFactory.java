@@ -15,7 +15,6 @@ import java.util.List;
 /**
  * 压测/离线测试用的模拟模型。
  *
- * <h3>为什么需要它</h3>
  * 压测流式接口时如果直接打真实模型，会遇到三个问题：
  * <ol>
  *   <li><b>成本</b>：100 并发 × 每轮几千 token，一次压测就烧掉可观的额度；</li>
@@ -25,16 +24,13 @@ import java.util.List;
  * </ol>
  * 用模拟模型可以把「我们自己的链路」单独拎出来压：
  * Redis Stream 写入、Pub/Sub 广播、SSE 推送、滑窗护栏、
- * 线程池与并发计数 —— 这些才是我们真正要保证的部分。
+ * 线程池与并发计数，这些才是我们真正要保证的部分。
  *
- * <h3>它模拟了什么</h3>
  * 按固定间隔逐块吐出预设文本，并返回带 token 用量的完整响应。
  * 间隔可配置，用来模拟不同档位模型的出字速度（TTFT 与吞吐）。
  *
- * <h3>安全开关</h3>
  * 只有显式设置 {@code dorm.agent.mock.enabled=true} 才会启用（默认关闭）。
- * 这个开关绝不能在生产环境打开 —— 那会让助手变成复读机，
- * 所以它在日志里会以醒目方式打印当前模式。
+ * 这个开关绝不能在生产环境打开，那会让助手变成复读机，
  */
 public final class MockModelFactory {
 
@@ -73,7 +69,7 @@ public final class MockModelFactory {
         @Override
         public void chat(ChatRequest request, StreamingChatResponseHandler handler) {
             if (asyncStreaming) {
-                // 关键：在**独立线程**里跑流。同步跑（默认）会让调用方一直阻塞到生成结束，
+                // 关键：在独立线程里跑流。同步跑（默认）会让调用方一直阻塞到生成结束，
                 // 使"生成超时"这类与生成并发的收口逻辑不可达，无法被验证。
                 Thread.ofVirtual().name("mock-stream").start(() -> stream(request, handler));
                 return;

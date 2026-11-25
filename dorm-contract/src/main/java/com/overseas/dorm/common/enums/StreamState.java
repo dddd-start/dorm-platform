@@ -16,7 +16,7 @@ import java.util.Arrays;
  * </ol>
  *
  * <p>此前这三处各写各的字符串字面量，一旦有人把 {@code "DONE"} 写成 {@code "COMPLETED"}，
- * 后果是"重连永远认为还在生成中"，客户端会一直等待直到超时 —— 而日志里没有任何报错。
+ * 后果是"重连永远认为还在生成中"，客户端会一直等待直到超时，而日志里没有任何报错。
  */
 @Getter
 public enum StreamState {

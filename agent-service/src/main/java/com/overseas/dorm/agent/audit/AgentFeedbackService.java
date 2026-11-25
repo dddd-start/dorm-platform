@@ -19,19 +19,16 @@ import org.springframework.stereotype.Service;
 /**
  * 回答反馈（点赞 / 点踩）。
  *
- * <h3>为什么把它从控制器里搬出来</h3>
- * 这个能力此前直接写在 {@code AgentController} 里，并因此带着两个真实缺陷：
  * <ol>
  *   <li><b>反馈从未成功写入过。</b> {@code agent_feedback.conversation_id} 是 NOT NULL，
- *       而插入时从未赋值 —— MyBatis-Plus 默认跳过 null 字段，于是数据库直接报
+ *       而插入时从未赋值，MyBatis-Plus 默认跳过 null 字段，于是数据库直接报
  *       "Field 'conversation_id' doesn't have a default value"，接口返回 9999。
  *       也就是说<b>前端每一次点赞/点踩都失败</b>，库里反馈行数长期为 0；</li>
  *   <li><b>没有归属校验。</b> 任何登录用户都可以对别人的消息提交反馈，
  *       既污染统计也可能被用来刷数据。</li>
  * </ol>
  * 业务规则（补全字段、校验归属、同步检索日志）本来就该由服务层承担，
- * 控制器只做参数解析与结果包装 —— 分层不是形式主义：把这三件事写在控制器里，
- * 就会像上面那样漏掉其中两件，而且没有任何测试会因此失败
+ * 控制器只做参数解析与结果包装，分层不是形式主义：把这三件事写在控制器里，
  * （因为当时的 E2E 根本没覆盖反馈接口）。
  */
 @Slf4j
@@ -93,7 +90,7 @@ public class AgentFeedbackService {
     }
 
     /**
-     * 把反馈同步到检索日志 —— 质量闭环里最容易断的一环。
+     * 把反馈同步到检索日志，质量闭环里最容易断的一环。
      *
      * <p>运维看板的点踩率读的是 {@code rag_retrieval_log.feedback}，而用户反馈写在
      * {@code agent_feedback}：两张表之间若不打通，点踩率会恒为 0，

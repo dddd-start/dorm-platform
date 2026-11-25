@@ -15,7 +15,7 @@ import java.util.List;
  * AI 用量日聚合数据访问。
  *
  * <p>累加用 {@code INSERT ... ON DUPLICATE KEY UPDATE} 的原子语义，
- * 不用"先查后更新"——并发下后者会丢增量，而用量是计费依据。
+ * 不用"先查后更新"，并发下后者会丢增量，而用量是计费依据。
  */
 @Mapper
 public interface AgentUsageDailyMapper extends BaseMapper<AgentUsageDaily> {

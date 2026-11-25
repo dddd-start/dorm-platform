@@ -30,10 +30,10 @@ import java.util.Arrays;
  *   解析 token → 校验签名与过期 → 校验会话白名单 + 认证版本 → 写入 UserContext → 校验 @RequireRole
  * </pre>
  *
- * <p><b>【订正】</b>这里原先还写着一步「校验账号是否被禁用」，但代码里**从来没有这一步**，
+ * <p><b>【订正】</b>这里原先还写着一步「校验账号是否被禁用」，但代码里从来没有这一步，
  * 而禁用也没有清会话（F 系列的"权限/会话变更立即生效"修复之前，禁用对已签发令牌完全无效）。
  * 现在吊销是通过<b>会话白名单 + 认证版本（epoch）</b>实现的：禁用 / 重置口令 / 角色或区域变更
- * 都会递增该用户的认证版本，令牌里的 epoch 一旦落后即被拒 —— 不再需要每请求回查账号状态。
+ * 都会递增该用户的认证版本，令牌里的 epoch 一旦落后即被拒，不再需要每请求回查账号状态。
  * 注释与实现必须一致：本项目已经因为"注释承诺了但没实现"踩过三次坑（F1/F2/H11）。
  *
  * <p>为什么不用 Spring Security 的过滤器链：本系统的权限模型很简单
@@ -77,7 +77,7 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
         UserContext.set(loginUser);
         boolean allowed = checkRole(request, response, handler, loginUser);
         if (!allowed) {
-            // 【F5 修复】preHandle 返回 false 时 Spring **不会**调用 afterCompletion，
+            // 【F5 修复】preHandle 返回 false 时 Spring 不会调用 afterCompletion，
             // 于是被拒的那次请求会把 LoginUser 留在 Tomcat 工作线程的 ThreadLocal 里：
             // 下一个复用该线程的请求若在写入 UserContext 之前读取它（例如某个工具/审计逻辑），
             // 就会读到上一个用户的身份。拒绝路径必须自己清干净。

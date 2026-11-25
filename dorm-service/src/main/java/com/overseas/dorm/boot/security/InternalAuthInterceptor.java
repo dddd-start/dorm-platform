@@ -31,8 +31,7 @@ import java.security.MessageDigest;
  *   <li>用户 JWT：身份不是由调用方声明的，而是从真实令牌解析并做会话白名单校验，
  *       因此 agent-service 无法伪造任意 userId 去读别人的数据。</li>
  * </ol>
- * 这与原单体里 Agent 工具直接调用 Service 的权限语义完全一致 ——
- * 只是把调用边界从进程内换成了 HTTP。
+ * 这与原单体里 Agent 工具直接调用 Service 的权限语义完全一致，* 只是把调用边界从进程内换成了 HTTP。
  */
 @Slf4j
 @Component

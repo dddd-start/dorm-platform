@@ -10,8 +10,7 @@ import java.util.function.Function;
 /**
  * 分页转换助手：把 MyBatis-Plus 的 {@code IPage} 转成与持久层解耦的 {@link PageResult}。
  *
- * <p>放在 domain 层而不是 common 层，是为了让 common 不反向依赖 MyBatis-Plus ——
- * 通用层一旦依赖持久层，就无法在 Agent / 前端 BFF 等场景中独立复用。
+ * <p>放在 domain 层而不是 common 层，是为了让 common 不反向依赖 MyBatis-Plus，* 通用层一旦依赖持久层，就无法在 Agent / 前端 BFF 等场景中独立复用。
  */
 public final class PageMapper {
 

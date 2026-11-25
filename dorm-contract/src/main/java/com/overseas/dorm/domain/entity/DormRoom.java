@@ -22,7 +22,7 @@ import java.time.LocalDateTime;
  * <p>{@code regionId} 是冗余字段：房间归属最终由公寓决定，
  * 但数据权限过滤与「按区域查空房」是最高频的查询，
  * 冗余一列区域 ID 换来的是避免每次查询都 JOIN 公寓表。
- * 冗余带来的是一致性责任 —— 公寓换区域时必须同步刷房间（见 RoomService）。
+ * 冗余带来的是一致性责任，公寓换区域时必须同步刷房间（见 RoomService）。
  */
 @Data
 @TableName("dorm_room")

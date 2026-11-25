@@ -11,8 +11,7 @@ import java.io.Serial;
  * <p>约定：
  * <ul>
  *   <li>携带 {@link ResultCode}，让调用方（Controller / Agent 工具）能按码做机器判定；</li>
- *   <li>{@code agentHint} 是给 AI 的「自然语言纠偏提示」——
- *       工具抛异常时，这段提示会被回灌给模型，引导它换个说法或换条路径，
+ *   <li>{@code agentHint} 是给 AI 的「自然语言纠偏提示」，*       工具抛异常时，这段提示会被回灌给模型，引导它换个说法或换条路径，
  *       而不是把堆栈信息暴露给用户。</li>
  * </ul>
  */

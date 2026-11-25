@@ -155,7 +155,7 @@ docker compose -f deploy/docker-compose.yml up --build
 
 ---
 
-## 六、关键设计（挑几个能被追问的）
+## 六、关键设计
 
 ### 6.1 SSE 流式协议：事件可续传、跨实例
 
@@ -236,7 +236,7 @@ node scripts/ui-check.mjs    # Playwright 页面检查（需自行安装 playwri
 | 浏览器页面检查 | 登录跳转、`/rooms`、`/admin/dashboard`、`/agent`、`/admin/agent-ops` 渲染正常、控制台无 error | `node scripts/ui-check.mjs`（需自行 `npm i playwright`） |
 | 知识库装载 | 10 篇文档 / 110 个切片，区域文档解析出 `region_id` | `GET /api/agent/admin/knowledge` |
 
-> 诚实边界：单测与 12 项冒烟进了 CI（零外部依赖，托管 runner 可直接跑）；
+> 说明：单测与 12 项冒烟进了 CI（零外部依赖，托管 runner 可直接跑）；
 > **27 项回归需要真实 MySQL/Redis，不在 CI 内**，靠本地 `scripts/regression.sh` 一键复跑。
 
 CI（`.github/workflows/ci.yml`）：JDK 21 + Maven 缓存跑后端单测，Node 24 跑 `npm ci && npm run build`；
@@ -280,8 +280,7 @@ dorm-platform/
 
 ## 十一、已知限制
 
-这个项目目前只在本机/内网运行，没有线上流量。下面这些点**确实没做到**，
-列出来是为了把"能力边界"讲清楚，而不是包装成"已完成"：
+这个项目目前只在本机/内网运行，没有线上流量。下面这些点确实没做到，一并列出：
 
 | # | 限制 | 现状 | 如果上线会怎么改 |
 |---|---|---|---|

@@ -23,8 +23,7 @@ import java.util.Map;
 /**
  * 统计服务（管理看板）。
  *
- * <p>所有统计口径都以服务端为准，且强制注入数据权限 ——
- * 「区域管理员看到的入住率」必须只是他自己区域的入住率，
+ * <p>所有统计口径都以服务端为准，且强制注入数据权限，* 「区域管理员看到的入住率」必须只是他自己区域的入住率，
  * 这类越权往往不是通过"读某个对象"发生，而是通过"读一个聚合数字"泄露的。
  */
 @Service
@@ -43,7 +42,7 @@ public class StatsService {
     public StatsVO overview(Long regionId, int trendDays) {
         // 设施类统计（房间/床位）仍按"可见区域"：房源是公共资源，员工可以查任何区域。
         Long scoped = dataScope.visibleRegionId() != null ? dataScope.visibleRegionId() : regionId;
-        // 【H7 修复】但**业务量**统计（申请/订单状态分布与趋势）必须按统计粒度收窄：
+        // 【H7 修复】但业务量统计（申请/订单状态分布与趋势）必须按统计粒度收窄：
         // 员工不应看到本区域所有人的申请与订单数量。同一个收口点，避免两套口径漂移。
         DataScope.StatsScope statsScope = dataScope.statisticsScope(regionId);
         StatsVO vo = new StatsVO();
@@ -82,7 +81,7 @@ public class StatsService {
                     .multiply(BigDecimal.valueOf(100))
                     .setScale(2, RoundingMode.HALF_UP));
 
-        // 状态分布是**动态键**的典型场景（键集合由数据决定），因此这里保留 Map，
+        // 状态分布是动态键的典型场景（键集合由数据决定），因此这里保留 Map，
         // 但把值类型收紧为 Long —— 动态键用 Map 是对的，"值为 Object"才是问题。
         Map<String, Long> applyStatus = new LinkedHashMap<>();
         for (StatusCountVO row : applyMapper.countByStatus(statsScope.regionId(), statsScope.employeeId())) {
@@ -108,8 +107,7 @@ public class StatsService {
      * 入住率（单独接口，Agent 工具会调用）。
      *
      * <p>改用 {@link OccupancyVO}：原来返回 {@code Map<String, Object>}，
-     * 其中 {@code occupancyRate} 是形如 {@code "12.5%"} 的字符串 ——
-     * 把"数值"和"展示格式"混在一起，前端要比较或排序还得再解析一次。
+     * 其中 {@code occupancyRate} 是形如 {@code "12.5%"} 的字符串，* 把"数值"和"展示格式"混在一起，前端要比较或排序还得再解析一次。
      * 现在返回百分比数值，符号由前端决定。
      */
     public OccupancyVO occupancy(Long regionId) {

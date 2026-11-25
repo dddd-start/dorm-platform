@@ -15,7 +15,7 @@ public class RagQualityMetricsVO implements Serializable {
     /** 检索总次数。 */
     private Long total;
 
-    /** 一条都没命中的次数 —— 知识库缺口的直接指标。 */
+    /** 一条都没命中的次数，知识库缺口的直接指标。 */
     private Long noHit;
 
     /** 命中缓存次数。 */

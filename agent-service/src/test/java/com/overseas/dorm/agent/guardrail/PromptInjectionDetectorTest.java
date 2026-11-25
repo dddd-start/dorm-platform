@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   <li><b>攻击集</b>：必须被拦下（漏拦 = 安全失效）；</li>
  *   <li><b>正常集</b>：必须放行（误拦 = 用户正常提问被拒，体验事故）。</li>
  * </ul>
- * 只测攻击集是不负责任的 —— 一个"全部拦截"的实现能通过所有攻击用例，
+ * 只测攻击集是不负责任的，一个"全部拦截"的实现能通过所有攻击用例，
  * 但产品会完全不可用。
  */
 class PromptInjectionDetectorTest {

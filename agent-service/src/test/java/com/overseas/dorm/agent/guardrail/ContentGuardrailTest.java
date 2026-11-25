@@ -10,7 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * 内容护栏测试 —— 重点验证「流式滑窗」的正确性。
+ * 内容护栏测试，重点验证「流式滑窗」的正确性。
  *
  * <p>流式审核最容易出的两个 bug，本测试各覆盖一个：
  * <ol>

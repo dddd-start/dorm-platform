@@ -16,7 +16,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  *   <li>{@code /api/**}：面向浏览器，JWT 校验；</li>
  *   <li>{@code /internal/**}：面向 agent-service，内部令牌 + 用户 JWT 校验。</li>
  * </ul>
- * 业务接口不提供 SPA 的 history 回退 —— 前端由 ui-service 独立托管，
+ * 业务接口不提供 SPA 的 history 回退，前端由 ui-service 独立托管，
  * 后端接口的 404 必须保持真实的 404。
  */
 @Configuration

@@ -7,7 +7,6 @@ import dev.langchain4j.service.UserMessage;
 /**
  * 宿舍助手的统一接口（LangChain4j AiService）。
  *
- * <h3>一个接口，多个实例</h3>
  * LangChain4j 的 AiServices 是"声明式"的：你只写接口，框架负责
  * 拼 Prompt、调模型、解析工具调用、回灌工具结果、维护记忆。
  * 这里只声明一个接口，然后在 {@link AgentRegistry} 中用不同的
@@ -18,12 +17,10 @@ import dev.langchain4j.service.UserMessage;
  * 5 份几乎一样的声明、5 处需要同步修改的地方，却不增加任何表达力。
  * 真正需要区分的是"配置"，配置就应该放在配置里。
  *
- * <h3>{@code @MemoryId} 的作用</h3>
  * 它是多轮对话的隔离键。LangChain4j 会用它从 ChatMemoryProvider 取对应会话的记忆，
  * 从而让不同用户、不同会话的上下文互不串扰。本项目传入的是 conversationId，
  * 记忆的实际存储在 {@code DormChatMemoryStore}（MySQL）。
  *
- * <h3>为什么返回 {@link TokenStream} 而不是 String</h3>
  * 我们需要的不是"最终答案"，而是"逐字生成的流"，
  * 因为要在生成过程中做实时安全审核、把 token 写入 Redis 供断点续传、
  * 以及把工具调用过程推送给前端。这些能力都只有在 TokenStream 上才拿得到。

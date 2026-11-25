@@ -20,10 +20,10 @@ import java.time.LocalDateTime;
  *
  * <p>三个插件的取舍：
  * <ul>
- *   <li><b>分页</b> —— 必须显式指定 DbType，否则 count 语句会走错方言；</li>
- *   <li><b>乐观锁</b> —— 与 {@code @Version} 配合，用于「读-改-写」场景
+ *   <li><b>分页</b>，必须显式指定 DbType，否则 count 语句会走错方言；</li>
+ *   <li><b>乐观锁</b>，与 {@code @Version} 配合，用于「读-改-写」场景
  *       （典型：管理员改房间状态），冲突时影响行数为 0，业务层需据此返回 4000；</li>
- *   <li><b>防全表更新删除</b> —— 这是一个「便宜的安全网」，
+ *   <li><b>防全表更新删除</b>，这是一个「便宜的安全网」，
  *       能在开发期就把 {@code update(entity, null)} 这类事故挡在测试环境里。</li>
  * </ul>
  */
@@ -49,7 +49,7 @@ public class MybatisPlusConfig {
      * 公共字段自动填充：create_by / create_time / update_by / update_time。
      *
      * <p>从 {@link UserContext} 取当前用户，因此所有写操作天然带上「谁改的」，
-     * 无需在每个 Service 里手动 set —— 手动 set 一定会有人忘。
+     * 无需在每个 Service 里手动 set，手动 set 一定会有人忘。
      */
     @Component
     public static class AuditMetaObjectHandler implements MetaObjectHandler {

@@ -23,16 +23,10 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 基于 MySQL 的 {@link ChatMemoryStore} 实现 —— 多轮对话的上下文来源。
+ * 基于 MySQL 的 {@link ChatMemoryStore} 实现，多轮对话的上下文来源。
  *
- * <h3>为什么需要它</h3>
  * LangChain4j 默认的 {@code InMemoryChatMemoryStore} 把对话存在 JVM 堆里，
- * 带来三个生产问题：重启即丢、多实例不一致、无法审计。
- * 换成数据库实现后，多轮对话的上下文就有了唯一且可追溯的来源。
  *
- * <h3>一个刻意的设计决定：{@code updateMessages} 是空实现</h3>
- * 直觉上这里应该把消息写库。但本系统的消息落库由 {@code AgentTurnService}
- * 统一负责，原因是流式场景下需要记录的元信息远多于 LangChain4j 的
  * {@code ChatMessage} 能承载的：
  * <pre>
  *   seq_no（会话内单调序号，保证不乱序）、turn_id（幂等键）、
@@ -42,10 +36,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * 如果这里再写一遍，就会出现<b>两份真相</b>：
  * 这份缺 seq、那份缺 token，出问题时无法判断以谁为准。
  *
- * <p>所以本类的定位是「<b>只读的数据库记忆视图</b>」：
  * <ul>
- *   <li>{@code getMessages} —— 从 {@code agent_message} 还原成 LangChain4j 的消息对象；</li>
- *   <li>{@code updateMessages} —— 空实现，消息由 AgentTurnService 写（已在写库后调用）。</li>
+ *   <li>{@code getMessages}，从 {@code agent_message} 还原成 LangChain4j 的消息对象；</li>
+ *   <li>{@code updateMessages}，空实现，消息由 AgentTurnService 写（已在写库后调用）。</li>
  * </ul>
  * 这个取舍在下面的方法注释里也会写清楚，避免后来者"顺手补上"而引入双写。
  */
@@ -63,8 +56,7 @@ public class DormChatMemoryStore implements ChatMemoryStore {
      * <p><b>【H11 修复】为什么需要它</b>：LangChain4j 的工具调用循环在一次
      * {@code AiService.chat()} 内部完成，循环每一轮都会重新读取 ChatMemory。
      * 本类原先的 {@code updateMessages} 是空实现，于是模型第一轮产生的
-     * assistant(tool_calls) 与工具返回的 TOOL 消息从来没有进入记忆 ——
-     * 下一轮模型仍然只看到最初那条用户消息，只能再次调用同一个工具。
+     * assistant(tool_calls) 与工具返回的 TOOL 消息从来没有进入记忆，* 下一轮模型仍然只看到最初那条用户消息，只能再次调用同一个工具。
      * 实测表现为：模型反复调用 listRegions/listBuildings，直到
      * {@code maxToolCallingRoundTrips} 用尽，用户只看到一句"我来帮你查一下…"。
      *
@@ -253,7 +245,7 @@ public class DormChatMemoryStore implements ChatMemoryStore {
     }
 
     /**
-     * 空实现 —— 见类注释。
+     * 空实现，见类注释。
      *
      * <p>消息的落库由 {@code AgentTurnService} 在流式生成的生命周期里完成
      * （用户消息在生成前落库、助手消息在生成完成后落库），

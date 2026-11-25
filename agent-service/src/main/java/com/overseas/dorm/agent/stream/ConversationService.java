@@ -33,7 +33,6 @@ import java.util.Map;
 /**
  * 会话与消息持久化服务。
  *
- * <h3>「消息不乱序」是怎么保证的</h3>
  * 每条消息都有一个<b>会话内单调递增</b>的 {@code seq_no}，
  * 且 {@code (conversation_id, seq_no)} 上有唯一索引。这带来三个性质：
  * <ol>
@@ -42,7 +41,6 @@ import java.util.Map;
  *   <li><b>不乱序</b>：客户端并发提交也只会有一个成功拿到某个序号。</li>
  * </ol>
  *
- * <h3>为什么序号要走"读最大值 + 1"，而不是自增列</h3>
  * 全局自增列会让同一会话内出现很大的序号跳跃（因为别的会话也在用），
  * 而"断点续传"依赖的恰恰是"会话内连续"。用 max+1 并在冲突时重试，
  * 配合唯一索引兜底，是这里的正确解法。
@@ -72,17 +70,16 @@ public class ConversationService {
     /**
      * 新建会话。
      *
-     * <h3>为什么插入要带重试</h3>
      * 单号生成器已经做了三层保护（Redis 原子取号 + 数据库最大值播种 + 生成后查库校验），
      * 但仍然存在一个无法靠"先查后插"消除的竞态窗口：
      * <pre>
      *   实例 A 取号 → 查库发现不存在 → （此刻实例 B 用同一个号插入了）→ A 插入 → 唯一索引冲突
      * </pre>
-     * 这个窗口在**多个实例使用不同 Redis db** 时更容易命中（各自的自增独立，
+     * 这个窗口在多个实例使用不同 Redis db 时更容易命中（各自的自增独立，
      * 播种值相同因而容易取到同一个号）。共享同一个 Redis 的生产部署下概率极低，
      * 但它终究是"两个检查之间的时间差"造成的，靠检查无法根除。
      *
-     * <p>正确做法是在<b>唯一的强一致点</b> —— 数据库唯一索引 —— 上做处理：
+     * <p>正确做法是在<b>唯一的强一致点</b>，数据库唯一索引，上做处理：
      * 冲突就把整条记录换个号重试。这也再次说明分布式系统的通用原则：
      * <b>唯一性最终必须由数据库保证，Redis/本地检查只能用来减少冲突概率。</b>
      */
@@ -172,7 +169,7 @@ public class ConversationService {
                         .set(type != null, AgentConversation::getAgentType, type));
     }
 
-    /** 首轮自动生成标题（用用户第一句话，超长则截断 —— 不必为此多花一次模型调用）。 */
+    /** 首轮自动生成标题（用用户第一句话，超长则截断，不必为此多花一次模型调用）。 */
     @Transactional
     public void ensureTitle(Long conversationId, String firstMessage) {
         // 条件更新：只有标题仍是默认值时才写入，省掉"先 select 判断"的一次往返
@@ -190,20 +187,18 @@ public class ConversationService {
      *
      * <p>用独立事务（{@code REQUIRES_NEW}）：流式生成期间，
      * 用户消息必须在"开始生成"之前就已经落库可见，
-     * 不能等到整个生成结束才提交 —— 否则用户刷新页面看不到自己刚发的问题。
+     * 不能等到整个生成结束才提交，否则用户刷新页面看不到自己刚发的问题。
      */
     /**
-     * 一轮对话的**开始**：把原本 4 次独立提交合并成 1 次。
+     * 一轮对话的开始：把原本 4 次独立提交合并成 1 次。
      *
-     * <h3>为什么要合并</h3>
      * 改造前每轮开始有 4 次各自提交的写入：用户消息、会话计数更新、标题更新、助手消息占位。
-     * 结束还有 3 次（终态回写、会话计数、用量累加）—— 合计 6~7 次提交。
+     * 结束还有 3 次（终态回写、会话计数、用量累加），合计 6~7 次提交。
      * 实测本机存储只有 26 次 fsync/秒、MySQL 每次提交约 2 次 fsync，
      * 于是 1000 并发 × 6~7 次提交 = 约 13000 次 fsync，物理上就要几百秒，
      * 表现为连接池被占满（waiting=310）、请求 3 秒超时。
      *
-     * <p>这些写入在业务上属于"同一次状态变更"，本来就应该在一个事务里 ——
-     * 拆成多次提交既慢，也意味着中途失败会留下"用户消息已入库、助手消息没建"的半截状态。
+     * <p>这些写入在业务上属于"同一次状态变更"，本来就应该在一个事务里，* 拆成多次提交既慢，也意味着中途失败会留下"用户消息已入库、助手消息没建"的半截状态。
      *
      * @return 预创建的助手消息（状态 STREAMING）
      */
@@ -214,7 +209,7 @@ public class ConversationService {
             return doBeginTurn(conversationId, userMessage, turnId, traceId);
         } catch (org.springframework.dao.DuplicateKeyException e) {
             // 并发提交同一个 turnId 时的胜者/败者竞争：数据库唯一索引
-            // uk_msg_turn_role 会把败者挡在这里。此时**绝不能**再生成一次 ——
+            // uk_msg_turn_role 会把败者挡在这里。此时绝不能再生成一次 ——
             // 那正是"重复调用模型、重复计费"的来源（独立验证实测 4 并发 → 3 条助手消息）。
             // 正确做法：读出胜者写入的那条助手消息，交给上层按"幂等重放"处理。
             log.info("[Agent] 同一 turnId 并发提交，本次由唯一索引拦截 turnId={}，转为重放既有回答", turnId);
@@ -240,7 +235,7 @@ public class ConversationService {
                                      String turnId, String traceId) {
         appendMessage(conversationId, AgentEnums.Role.USER, userMessage, turnId, traceId);
         // 会话计数 + 时间 + 标题（条件更新，只在仍是默认标题时写入）
-        // 标题来自用户消息，**必须参数绑定**，不能拼进 SQL 字符串：
+        // 标题来自用户消息，必须参数绑定，不能拼进 SQL 字符串：
         // 原实现用 sqlLiteral 只把单引号换成两个，没处理反斜杠（MySQL 默认反斜杠是转义符），
         // 构造 "\\' OR 1=1 -- " 之类的输入即构成写路径 SQL 注入。
         conversationMapper.update(null,
@@ -255,7 +250,7 @@ public class ConversationService {
     }
 
     /**
-     * 一轮对话的**结束**：把原本 3 次独立提交合并成 1 次（终态回写 + 会话计数 + 用量累加）。
+     * 一轮对话的结束：把原本 3 次独立提交合并成 1 次（终态回写 + 会话计数 + 用量累加）。
      *
      * @param promptTokens  本轮输入 token
      * @param outputTokens  本轮输出 token
@@ -299,8 +294,7 @@ public class ConversationService {
      * 用量聚合（与终态回写同事务）。
      *
      * <p>放在这里而不是各自一个事务，是为了把"一轮结束"的写入压到一次提交。
-     * 代价是：用量统计与消息状态现在同生共死（要么都成功、要么都回滚）——
-     * 这对计费数据来说其实是更好的语义。
+     * 代价是：用量统计与消息状态现在同生共死（要么都成功、要么都回滚），* 这对计费数据来说其实是更好的语义。
      */
     private void accumulateUsage(Long userId, int promptTokens, int outputTokens, int toolCalls,
                                  int ragHits, boolean blocked, boolean newConversation) {
@@ -378,7 +372,6 @@ public class ConversationService {
     /**
      * 分配会话内下一个序号。
      *
-     * <h3>为什么不用 {@code SELECT MAX(seq_no) + 1}</h3>
      * 压测发现这是一个真实的高并发缺陷：在 REPEATABLE READ 下，
      * {@code SELECT MAX(...)} 会加<b>间隙锁</b>；多个并发事务同时对同一张表
      * 做「取最大值 + 插入」时，间隙锁与插入意向锁互相等待，
@@ -387,7 +380,7 @@ public class ConversationService {
      * <p>改用 Redis 的 {@code INCR}：它是原子操作，不涉及数据库锁，
      * 天然无竞争。首次使用时用数据库的真实最大值播种（SETNX），
      * 之后即使 Redis 数据丢失导致重号，也会被
-     * {@code uk_msg_conv_seq} 唯一索引拦下并重新取号 —— 正确性由数据库兜底。
+     * {@code uk_msg_conv_seq} 唯一索引拦下并重新取号，正确性由数据库兜底。
      */
     private int nextSeqNo(Long conversationId) {
         String key = com.overseas.dorm.common.constant.RedisKeys.PREFIX + "conv:seq:" + conversationId;
@@ -427,7 +420,7 @@ public class ConversationService {
         // 而 DONE 事件其实如实上报了 model —— 于是前端/历史消息无法回答
         // "这条回答是哪个模型给的"。模型可切换与降级是本项目的常态（降级链 + 熔断），
         // 没有这个字段就无法事后判断"某段时间的回答质量下降是不是因为降到了弱模型"。
-        // 注意：调用方必须传**实际服务的**模型（降级后要用降级后的那个），而不是配置里的主模型。
+        // 注意：调用方必须传实际服务的模型（降级后要用降级后的那个），而不是配置里的主模型。
         update.setModel(model);
         update.setReasoningContent(reasoningContent);
         update.setStatus(status);
@@ -528,7 +521,7 @@ public class ConversationService {
     }
 
     /**
-     * 按 turnId 查找助手消息 —— 幂等复用的关键。
+     * 按 turnId 查找助手消息，幂等复用的关键。
      *
      * <p>同一个 turnId 重复提交时，我们不复用用户消息而是复用<b>助手消息</b>：
      * 前者是"用户说过的话"，后者是"我们给出的回答"。

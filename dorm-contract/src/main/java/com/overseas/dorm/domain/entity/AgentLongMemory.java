@@ -16,9 +16,9 @@ import java.time.LocalDateTime;
  * <p>短期记忆（最近若干轮对话）放在 {@code agent_message} 里按窗口读取；
  * 长期记忆是「跨会话仍然有效的信息」，例如：
  * <ul>
- *   <li>PROFILE —— 常驻城市、所属部门；</li>
- *   <li>PREFERENCE —— 偏好房型、偏好公寓、是否介意合住（key 唯一，可覆盖更新）；</li>
- *   <li>SUMMARY —— 某次会话的结论摘要，供下次直接引用。</li>
+ *   <li>PROFILE，常驻城市、所属部门；</li>
+ *   <li>PREFERENCE，偏好房型、偏好公寓、是否介意合住（key 唯一，可覆盖更新）；</li>
+ *   <li>SUMMARY，某次会话的结论摘要，供下次直接引用。</li>
  * </ul>
  * 设计上刻意把「画像」与「对话记录」分开：画像可被更新、可被用户清除，
  * 而对话记录是不可变的事实流水。

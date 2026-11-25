@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
  *   拼 Prompt：只允许用掩码，且再过一遍 SensitiveMasker
  * </pre>
  * 三列各司其职的好处是：即使业务代码写错了，
- * 也不可能因为「顺手 select *」就把明文手机号带进 Prompt —— 库里压根没有明文。
+ * 也不可能因为「顺手 select *」就把明文手机号带进 Prompt，库里压根没有明文。
  */
 @Component
 @RequiredArgsConstructor

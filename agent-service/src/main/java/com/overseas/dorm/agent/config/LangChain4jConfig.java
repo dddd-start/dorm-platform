@@ -23,8 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * LangChain4j 装配。
  *
  * <p><b>为什么不用 langchain4j 的 Spring Boot Starter</b>：
- * Starter 会通过约定自动装配一批 bean，看起来省事，但对学习很不友好 ——
- * 「模型是怎么被创建出来的、参数从哪来、什么时候生效」全被藏进了自动配置里。
+ * Starter 会通过约定自动装配一批 bean，看起来省事，但对学习很不友好，* 「模型是怎么被创建出来的、参数从哪来、什么时候生效」全被藏进了自动配置里。
  * 这里全部手写 {@code @Bean}，让你在启动日志里就能看到每个模型的实际参数。
  *
  * <p>本类只负责<b>造模型</b>，不负责<b>选模型</b>：
@@ -82,7 +81,7 @@ public class LangChain4jConfig {
      * 快模型：意图路由、标题生成、摘要这类"轻任务"。
      *
      * <p>为什么要把轻任务拆出去：一次意图路由只需要模型输出一个枚举值，
-     * 用主模型是纯粹的浪费 —— 既慢又贵。这是成本控制里
+     * 用主模型是纯粹的浪费，既慢又贵。这是成本控制里
      * 「按任务价值选择模型档位」最直接的体现。
      */
     @Bean("fastChatModel")
@@ -117,7 +116,7 @@ public class LangChain4jConfig {
     /**
      * 模型工厂：按名称产出 ChatModel，带缓存。
      *
-     * <p>缓存是必要的 —— 每次请求都新建一个 HTTP 客户端会迅速耗尽连接池；
+     * <p>缓存是必要的，每次请求都新建一个 HTTP 客户端会迅速耗尽连接池；
      * 而 {@code OpenAiChatModel} 内部持有连接池，必须复用。
      */
     @Bean

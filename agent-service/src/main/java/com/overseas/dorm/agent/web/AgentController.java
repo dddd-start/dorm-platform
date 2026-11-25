@@ -43,7 +43,6 @@ import java.util.List;
 /**
  * AI 助手接口。
  *
- * <h3>流式接口的两种客户端用法</h3>
  * <pre>
  *   PC 端（推荐）：
  *     fetch('/api/agent/chat/stream', {method:'POST', headers:{Authorization: 'Bearer ...'}, body: json})
@@ -56,7 +55,6 @@ import java.util.List;
  *     服务端的鉴权拦截器显式支持这种传法）。两条路径共用同一套事件契约。
  * </pre>
  *
- * <h3>关于返回值类型</h3>
  * 本控制器不再返回 {@code Map<String, Object>}，而是各自的 VO。
  * 原因不是"看起来更高级"，而是 {@code Map} 会让接口契约退化：
  * Swagger 只能把它显示成"一个对象"，前端无法据此生成类型，

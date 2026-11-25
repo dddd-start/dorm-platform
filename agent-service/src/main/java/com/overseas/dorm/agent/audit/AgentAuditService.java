@@ -28,7 +28,6 @@ import java.util.concurrent.ThreadLocalRandom;
 /**
  * Agent 审计与用量服务。
  *
- * <h3>三张表，各回答一类问题</h3>
  * <table>
  *   <tr><th>表</th><th>回答的问题</th></tr>
  *   <tr><td>{@code agent_message}</td>
@@ -39,7 +38,6 @@ import java.util.concurrent.ThreadLocalRandom;
  *       <td>「今天这个用户/整个平台消耗了多少 token、成本多少」</td></tr>
  * </table>
  *
- * <h3>为什么用量要用"累加"而不是"重算"</h3>
  * 用 {@code INSERT ... ON DUPLICATE KEY UPDATE x = x + VALUES(x)} 做原子累加，
  * 而不是「查出来 + 加上增量 + 写回去」。后者在并发下会丢增量：
  * 同一个用户同时开了两个流，各自读到 100，各自加 50 写回 150，
@@ -102,7 +100,6 @@ public class AgentAuditService {
     /**
      * 工具调用去重判定。
      *
-     * <h3>为什么需要"同轮去重"</h3>
      * 模型在实际运行中经常重复调用同一个工具并传完全一样的参数，典型场景：
      * <ul>
      *   <li>第一次调用返回空结果，模型"不甘心"再调一次；</li>
@@ -110,7 +107,6 @@ public class AgentAuditService {
      *   <li>部分模型对工具结果的格式不敏感，误判为失败后重试。</li>
      * </ul>
      * 这些重复调用既浪费 token 与时间，也可能放大副作用（对写操作尤其危险）。
-     * 因此在同一轮内对 {@code (工具名 + 参数)} 做指纹，命中则直接返回上次的结果。
      *
      * <p>为什么按"轮"而不是按"会话"去重：跨轮重复调用往往是合理的
      * （用户可能几分钟后问"那间房现在还有吗"），不能一概拦截。

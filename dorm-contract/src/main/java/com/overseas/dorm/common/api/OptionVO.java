@@ -21,8 +21,7 @@ import java.io.Serializable;
 public record OptionVO(String value, String label, String color) implements Serializable {
 
     /**
-     * @param color 展示色（可空）。状态类字典用它让前端渲染标签颜色 ——
-     *              放在后端是为了避免"前端再维护一份状态→颜色映射"，那种映射必然漏项。
+     * @param color 展示色（可空）。状态类字典用它让前端渲染标签颜色，*              放在后端是为了避免"前端再维护一份状态→颜色映射"，那种映射必然漏项。
      */
     public OptionVO {
     }

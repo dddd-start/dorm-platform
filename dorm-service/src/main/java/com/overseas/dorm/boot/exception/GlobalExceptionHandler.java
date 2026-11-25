@@ -30,8 +30,8 @@ import java.util.stream.Collectors;
  *
  * <p>核心原则：<b>把"给用户看的"和"给开发看的"分开</b>。
  * <ul>
- *   <li>业务异常（{@link BizException}）—— 消息是写给用户的，直接返回；</li>
- *   <li>系统异常 —— 返回统一兜底文案，真实堆栈只进日志，
+ *   <li>业务异常（{@link BizException}），消息是写给用户的，直接返回；</li>
+ *   <li>系统异常，返回统一兜底文案，真实堆栈只进日志，
  *       响应里只带 traceId。这样既不泄露内部结构（表名、SQL、类名），
  *       又让用户报障时可以凭 traceId 精确找回日志。</li>
  * </ul>
@@ -102,9 +102,7 @@ public class GlobalExceptionHandler {
     /**
      * 资源/接口不存在。
      *
-     * <h3>为什么这里要显式返回 HTTP 404（而其它接口统一是 HTTP 200）</h3>
-     * 本项目的接口约定是「HTTP 状态码恒为 200，业务结果放在响应体的 code 里」——
-     * 这样前端只需要判断业务码，不用同时处理"网络层错误"与"业务层错误"两套分支。
+     * 本项目的接口约定是「HTTP 状态码恒为 200，业务结果放在响应体的 code 里」，* 这样前端只需要判断业务码，不用同时处理"网络层错误"与"业务层错误"两套分支。
      *
      * <p>但<b>路径不存在</b>是唯一的例外，必须给出真实的 404：
      * <ul>
@@ -116,7 +114,6 @@ public class GlobalExceptionHandler {
      *   <li>接口联调时，路径拼错应当立刻表现为 404，而不是一个需要读懂
      *       业务码才知道含义的 200 响应。</li>
      * </ul>
-     * 响应体仍然保持统一的 {@link Result} 结构，因此前端处理逻辑不变。
      */
     @ExceptionHandler(NoResourceFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
@@ -125,11 +122,11 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * 客户端在流式输出过程中断开 —— <b>这不是服务端错误</b>。
+     * 客户端在流式输出过程中断开，<b>这不是服务端错误</b>。
      *
      * <p>SSE 长连接断开是常态（关页面、切网络、手机后台），
      * 此时再往已失效的响应里写数据会抛 {@code AsyncRequestNotUsableException}。
-     * 改造前它落到兜底 handler，被记为 {@code ERROR 系统异常} 并返回 9999 —— 后果有两个：
+     * 改造前它落到兜底 handler，被记为 {@code ERROR 系统异常} 并返回 9999，后果有两个：
      * <ul>
      *   <li><b>告警噪音</b>：千级并发下每次断线都产生一条系统异常日志，
      *       真正的故障被淹没，运维会逐渐忽略这个日志；</li>
@@ -148,8 +145,8 @@ public class GlobalExceptionHandler {
     /**
      * 响应已提交后写失败：同样按"客户端/连接层"处理，不打 ERROR。
      *
-     * <p>但**必须区分**：如果响应尚未提交，说明可能是真的序列化缺陷，
-     * 仍然走兜底 handler 记 ERROR —— 不能让这类问题被"当成断连"掩盖掉。
+     * <p>但必须区分：如果响应尚未提交，说明可能是真的序列化缺陷，
+     * 仍然走兜底 handler 记 ERROR，不能让这类问题被"当成断连"掩盖掉。
      */
     @ExceptionHandler(org.springframework.http.converter.HttpMessageNotWritableException.class)
     public void handleNotWritable(

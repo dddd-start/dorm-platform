@@ -36,7 +36,7 @@ public class AgentProperties {
      *
      * <p>本项目对接 Command Code（OpenAI 兼容协议）。
      * 换成私有化部署（vLLM / Ollama / 一体机）时只需改 base-url 与模型名，
-     * 代码零改动 —— 这是「私有部署 vs 外部 API」这道选择题的技术前提。
+     * 代码零改动，这是「私有部署 vs 外部 API」这道选择题的技术前提。
      */
     @Data
     public static class Provider {
@@ -53,9 +53,9 @@ public class AgentProperties {
      *
      * <p>三级结构，对应三类任务：
      * <ul>
-     *   <li>{@link #primary} —— 主对话模型（效果优先）；</li>
-     *   <li>{@link #fast} —— 意图路由、摘要、标题生成（延迟/成本优先）；</li>
-     *   <li>{@link #fallback} —— 主模型不可用时的降级链，按顺序尝试。</li>
+     *   <li>{@link #primary}，主对话模型（效果优先）；</li>
+     *   <li>{@link #fast}，意图路由、摘要、标题生成（延迟/成本优先）；</li>
+     *   <li>{@link #fallback}，主模型不可用时的降级链，按顺序尝试。</li>
      * </ul>
      */
     @Data
@@ -74,7 +74,7 @@ public class AgentProperties {
         private int maxToolRoundTrips = 3;
 
         /**
-         * 上游模型的**最大并发调用数**（保护模型服务商）。
+         * 上游模型的最大并发调用数（保护模型服务商）。
          *
          * <p>与 {@code dorm.agent.stream.max-streams-global} 刻意解耦：
          * 前者是"容器能容纳多少条并发流"，后者是"我们向上游同时发多少请求"。
@@ -153,8 +153,7 @@ public class AgentProperties {
          *
          * <p>这一层是"单容器支撑千级长连接"的关键：生成线程只把帧<b>非阻塞入队</b>，
          * 由连接专属的虚拟线程负责写入 socket。队列满意味着该客户端已经跟不上
-         * （弱网、切后台、假死），此时主动断开它并让前端重连续传 ——
-         * <b>牺牲一条连接，保住其余 999 条</b>，而不是让生产者阻塞在一个慢客户端上。
+         * （弱网、切后台、假死），此时主动断开它并让前端重连续传，* <b>牺牲一条连接，保住其余 999 条</b>，而不是让生产者阻塞在一个慢客户端上。
          *
          * <p>容量按"最坏内存"反推：容量 × 单帧大小 × 连接数。
          * 单帧约 200~500 字节（含 JSON 包装），512 帧 ≈ 100~250KB/连接；
@@ -189,7 +188,7 @@ public class AgentProperties {
          * 单条消息允许的最大字符数。
          *
          * <p>此前这个数字硬编码在控制器的 meta 接口里（4000），而真正的长度校验
-         * 在护栏里用的是另一个常量 —— 也就是说"界面上写的限制"和"实际生效的限制"
+         * 在护栏里用的是另一个常量，也就是说"界面上写的限制"和"实际生效的限制"
          * 是两份数据。现在统一由这里提供，meta 接口下发真实生效值。
          */
         private int maxMessageLength = 4000;
@@ -214,7 +213,7 @@ public class AgentProperties {
      *
      * <p>开启后使用本地模拟模型代替真实模型：不消耗任何模型额度、
      * 延迟确定、结果可重复，专门用于压测我们自己的流式链路。
-     * <b>绝不能在生产环境开启</b> —— 那会让助手变成复读机。
+     * <b>绝不能在生产环境开启</b>，那会让助手变成复读机。
      */
     @Data
     public static class Mock {
@@ -223,11 +222,11 @@ public class AgentProperties {
         private int chunkSize = 6;
 
         /**
-         * mock 是否**异步**流式返回（默认 false，保持与既有压测一致的测量条件）。
+         * mock 是否异步流式返回（默认 false，保持与既有压测一致的测量条件）。
          *
          * <p>为什么需要这个开关：默认的 mock 在调用线程里同步跑完整个流
          * （chunk 之间 {@code Thread.sleep}），于是 {@code .start()} 会一直阻塞到生成结束，
-         * "生成超时"那段收口代码**根本不可达** —— 实测：配置 10 秒超时、mock 跑 177 秒，
+         * "生成超时"那段收口代码根本不可达，实测：配置 10 秒超时、mock 跑 177 秒，
          * 超时从未触发；而真实 provider 是异步的（历史上超时触发过 9 次）。
          * 要验证超时/中断这类与生成并发的逻辑，必须让 mock 也异步。
          *
@@ -242,10 +241,9 @@ public class AgentProperties {
          * <p><b>字段名必须与配置键的"归一化形式"一致</b>，否则会被静默忽略：
          * Spring 的松散绑定会把 {@code delay-ms} 归一化成 {@code delayms}，
          * 而原来的字段名是 {@code delayMillis}（归一化后 {@code delaymillis}），
-         * 两者对不上 —— 于是 {@code dorm.agent.mock.delay-ms} 这个配置项
+         * 两者对不上，于是 {@code dorm.agent.mock.delay-ms} 这个配置项
          * <b>一直没生效</b>，字段始终是默认值 15。
          *
-         * <p>它之所以长期没被发现，是因为 application.yml 里恰好也写的 15，
          * 与默认值相同，"看起来一切正常"。直到压测脚本用命令行把它覆盖成 1500
          * 却发现单轮耗时依旧是 1 秒多，才暴露出来。
          *

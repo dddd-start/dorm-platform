@@ -45,9 +45,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * 一轮对话的流式编排 —— 全项目最核心也最复杂的一个类。
+ * 一轮对话的流式编排，全项目最核心也最复杂的一个类。
  *
- * <h3>它要同时满足的需求</h3>
  * <table>
  *   <tr><th>需求</th><th>实现手段</th></tr>
  *   <tr><td>逐字输出</td><td>TokenStream.onPartialResponse → 推 SSE</td></tr>
@@ -63,7 +62,6 @@ import java.util.concurrent.atomic.AtomicLong;
  *   <tr><td>可审计</td><td>用户消息/助手消息/工具调用/token 用量全部落库</td></tr>
  * </table>
  *
- * <h3>关键设计决定：断线之后还要不要继续生成？</h3>
  * 三种策略各有问题：
  * <pre>
  *   A. 立刻停止   → 用户切个后台回来发现回答只有一半，体验差；
@@ -97,7 +95,7 @@ public class AgentTurnService {
      *
      * <p><b>【H10 修复】</b>原先"停止生成"只往 Redis 写一个 cancel 标记
      * （{@code AgentStreamBuffer.markCancelled}），模型回调看到标记就丢弃后续 token，
-     * 但**没有任何东西去终结这一轮** —— 终态仍然要等模型自然收流后由
+     * 但没有任何东西去终结这一轮，终态仍然要等模型自然收流后由
      * {@code onCompleteResponse → finishSuccessfully} 写出，于是：
      * 用户点了停止，却拿到 {@code DONE} + 落库 {@code COMPLETED} + 审计 SUCCESS，
      * 而正文已经被静默截断（实测 96/345 字，停在句子中间）。
@@ -134,7 +132,7 @@ public class AgentTurnService {
      * 单值会在续传接入时覆盖生成连接的 ID，导致生成结束时把整条消息的本地记录
      * 无条件删掉（P1-3），并且让心跳无法判断"本实例是否还有人在收"。
      *
-     * <p>注意这里只放**本实例**的信息，跨实例的可见性由 Redis 里的订阅键提供。
+     * <p>注意这里只放本实例的信息，跨实例的可见性由 Redis 里的订阅键提供。
      * 两者职责不同：Redis 键回答"全局还有没有人接收"，
      * 本地映射回答"本实例还要不要给它续期"。
      */
@@ -153,12 +151,10 @@ public class AgentTurnService {
     private static final long CANCEL_CHECK_INTERVAL_MS = 500L;
 
     /**
-     * 在线连接表：messageId → 该消息上**全部**在线连接的出站通道集合。
+     * 在线连接表：messageId → 该消息上全部在线连接的出站通道集合。
      *
      * <p>所有写入都必须经过通道（write-behind），生产者永不直接写 socket；
-     * 实例级的心跳与看门狗也通过它来驱动，因此不再需要"每连接一个定时任务"。
      *
-     * <h3>为什么是 Set 而不是单个通道（H3/H4 的核心）</h3>
      * 原实现是 {@code Map<Long, SseChannel>}，等价于"同一条消息只允许一条连接"：
      * <ul>
      *   <li>{@code resume()} 里 {@code channels.put()} 覆盖旧值并 {@code close()} 旧连接
@@ -169,7 +165,7 @@ public class AgentTurnService {
      *       （实测同一已完成后消息并发 5 条续传：0~3/30 拿到完整内容、90% 空响应，H3）。</li>
      * </ul>
      * 改成集合后：同一 messageId 上生成连接与任意多条续传连接并存、各自独立收尾；
-     * 轮次结束时 {@code closeChannel} 向集合里的**每一条**连接发终态并收尾。
+     * 轮次结束时 {@code closeChannel} 向集合里的每一条连接发终态并收尾。
      */
     private final Map<Long, Set<SseChannel>> channels = new ConcurrentHashMap<>();
     /** messageId -> 是否已经因为客户端断开而"孤儿化"。 */
@@ -239,8 +235,7 @@ public class AgentTurnService {
      * 构造一个立即返回错误并关闭的 SSE 连接。
      *
      * <p>这样前端只需要一套解析逻辑：连接建立 → 收到 ERROR 帧 → 展示 message。
-     * 不需要再区分"HTTP 500 的 JSON 错误"与"SSE 流内的错误"两种形态 ——
-     * 那种双形态契约在实际联调中几乎一定会漏掉一种。
+     * 不需要再区分"HTTP 500 的 JSON 错误"与"SSE 流内的错误"两种形态，* 那种双形态契约在实际联调中几乎一定会漏掉一种。
      */
     private SseEmitter errorEmitter(ResultCode code, String message) {
         SseEmitter emitter = new SseEmitter(0L);
@@ -275,12 +270,12 @@ public class AgentTurnService {
                 ? java.util.UUID.randomUUID().toString() : turnId;
         String traceId = TraceContext.getOrCreate();
 
-        // ---- 2. 幂等预检：**必须先于限流 / 预算 / 并发计数** ----
+        // ---- 2. 幂等预检：必须先于限流 / 预算 / 并发计数 ----
         //
         // 【M10 修复】纯重放不调用模型、不占用生成资源，因此不应消耗任何配额。
         // 原实现把幂等检查放在限流之后（第 6 步），于是客户端因网络抖动重试同一个
         // turnId 时，每次重试都白扣一个令牌：实测连续重放几次就把 20 次/分钟的
-        // 配额吃光，用户随后**真正**的提问被 6001 拦下 —— 花的是重试的钱，
+        // 配额吃光，用户随后真正的提问被 6001 拦下 —— 花的是重试的钱，
         // 拦的是真实的提问。
         //
         // 归属校验不需要额外查询：findAssistantByTurn 的 SQL 带 user_id 条件，
@@ -455,7 +450,7 @@ public class AgentTurnService {
      * </pre>
      * 为什么必须先订阅再拉历史：如果先拉历史再订阅，
      * 两步之间产生的 token 既不在历史里（拉的时候还没写进去）、
-     * 也收不到（还没订阅）—— 就会永远丢掉那几个字。
+     * 也收不到（还没订阅），就会永远丢掉那几个字。
      */
     public SseEmitter resume(Long messageId, long lastEventId) {
         LoginUser user = UserContext.require();
@@ -473,10 +468,10 @@ public class AgentTurnService {
         // 【H3/H4 修复】不再"同一条消息只保留最新连接"。
         //
         // 原实现 `channels.put(messageId, channel)` + `previous.close()` 有两重危害：
-        //   1) 开一条续传会**静默踢掉正在生成的原连接**，原连接收不到任何终态事件，
+        //   1) 开一条续传会静默踢掉正在生成的原连接，原连接收不到任何终态事件，
         //      客户端无法区分"正常结束"与"我被踢下线"（H4）；
         //   2) 被踢连接的清理又调用 closeChannel(messageId)（按 messageId 关掉
-        //      此刻表里的**最新**连接）→ 多条连接互相消灭（H3，实测 90% 空响应）。
+        //      此刻表里的最新连接）→ 多条连接互相消灭（H3，实测 90% 空响应）。
         //
         // 现在同一 messageId 允许多条连接并存：生成连接与任意多条续传连接各自独立收尾。
         // 这里选择"补完历史再注册进 channels"：补历史期间的事件由 Pub/Sub 订阅缓存，
@@ -545,7 +540,7 @@ public class AgentTurnService {
         // 表现就是断点续传后事件序号出现空洞 —— 文字可能刚好没丢，但过程事件丢了。
         // 订阅回调在补历史期间只往缓冲队列里放，等历史补完再统一按 seq 去重转发。
         //
-        // 订阅按 messageId **共享一份**（AgentStreamBuffer 内部引用计数）：
+        // 订阅按 messageId 共享一份（AgentStreamBuffer 内部引用计数）：
         // 多条并发续传不会再互相破坏订阅生命周期。
         subscriptionHolder[0] = streamBuffer.subscribe(messageId, event -> {
             if (closed.get()) {
@@ -600,7 +595,7 @@ public class AgentTurnService {
         // 续传连接同样需要心跳：既保活（长回答期间代理可能因空闲断连），
         // 也续期订阅键（否则重连后经过一个 TTL 会被看门狗误判为无人接收）。
         //
-        // 注意：SseEmitter 的 onCompletion/onTimeout/onError 都是**单回调**（后注册覆盖先注册），
+        // 注意：SseEmitter 的 onCompletion/onTimeout/onError 都是单回调（后注册覆盖先注册），
         // 所以这里必须把"关闭通道"一并做掉，否则会覆盖 SseChannel 构造时注册的
         // onCompletion(this::close)，导致客户端断开后通道不被收尾。
         emitter.onCompletion(cleanup);
@@ -899,7 +894,7 @@ public class AgentTurnService {
                 // 兜底：正常终态路径已经 closeChannel 了，这里只处理异常/遗漏路径，
                 // 避免 channels 表随着运行时间无限增长。
                 //
-                // 【多连接】这里必须按 messageId 把**该消息上的所有连接**都收尾：
+                // 【多连接】这里必须按 messageId 把该消息上的所有连接都收尾：
                 // 走到这里说明本轮已经结束，此刻还挂在上面的续传连接同样应该收到终态
                 // 并关闭连接（原来只 remove 单个通道，多连接下会漏掉其它连接，
                 // 它们只能等 90 秒的假死回收 —— 用户在那之前一直转圈）。
@@ -924,7 +919,6 @@ public class AgentTurnService {
     /**
      * 正常收尾。
      *
-     * <h3>这里有一个极易踩的"重复计数"陷阱</h3>
      * {@code answer} 累加的是模型产出的<b>原始 token</b>，其中已经包含了
      * 被护栏滑窗扣留的那部分（扣留只是延迟推送，不是丢弃）。
      * 因此收尾时把 {@code guard.finish()} 放行的 tail 再追加进 {@code answer}，
@@ -941,7 +935,7 @@ public class AgentTurnService {
                                     int toolCalls, int ragHits, boolean newConversation, LoginUser user,
                                     AtomicLong sequence,
                                     java.util.concurrent.locks.ReentrantLock turnLock) {
-        // 【H10 修复】取消兜底：如果用户在生成过程中点了停止，这一轮**不是成功**。
+        // 【H10 修复】取消兜底：如果用户在生成过程中点了停止，这一轮不是成功。
         // 覆盖的窗口：取消恰好落在"最后一个 token"与 onCompleteResponse 之间
         // （此时中止钩子可能还没抢到 finished，或者钩子已收口但本回调抢先 CAS）。
         // 没有这条判断时，模型正常收流就会写出 DONE/COMPLETED/SUCCESS —— 实测就是这样丢掉半个回答的。
@@ -991,7 +985,7 @@ public class AgentTurnService {
         // （实测落库末尾停在表格的 "| "）。必须明确告诉用户，不能静默当成功。
         if (status == AgentEnums.MessageStatus.COMPLETED
                 && response != null && response.finishReason() == FinishReason.LENGTH) {
-            String notice = "\n\n> **注意**：本次回答达到模型单轮输出上限（max-tokens="
+            String notice = "\n\n> 注意：本次回答达到模型单轮输出上限（max-tokens="
                     + properties.getModel().getMaxTokens()
                     + "），内容可能不完整。可以让我继续，或把问题拆得更具体。";
             publish(messageId, sequence, AgentEnums.StreamEvent.DELTA, Map.of("text", notice));
@@ -1060,15 +1054,15 @@ public class AgentTurnService {
      *
      * <p>与"超时/异常"路径的区别，也是这一条缺陷的要害：
      * <ul>
-     *   <li>状态必须是 {@code INTERRUPTED}（不是 {@code COMPLETED}）—— 否则用户看到一份"成功"的回答；</li>
-     *   <li>**已生成的部分要保留**（用户等了几十秒的内容不能因为点了停止就丢掉），
+     *   <li>状态必须是 {@code INTERRUPTED}（不是 {@code COMPLETED}），否则用户看到一份"成功"的回答；</li>
+     *   <li>已生成的部分要保留（用户等了几十秒的内容不能因为点了停止就丢掉），
      *       但要通过终态事件与落库状态<b>明确标记为已打断</b>，而不是静默截断；</li>
      *   <li>审计记 {@code AGENT_TURN_STOPPED}（不是 {@code AGENT_TURN} 的成功），
      *       原因串写"用户主动停止生成"，绝不能借用超时文案（否则排障被带偏）；</li>
      *   <li>不递增任何"失败/重试"指标：用户主动停止不是系统故障。</li>
      * </ul>
      *
-     * <p>线程安全：快照在 {@code turnLock} 下读取 —— 此刻可能仍有模型回调在追加正文，
+     * <p>线程安全：快照在 {@code turnLock} 下读取，此刻可能仍有模型回调在追加正文，
      * 不互斥读取 {@link StringBuilder} 会读到撕裂的内容。
      */
     private void finishInterrupted(SseEmitter emitter, Long messageId, Long conversationId,
@@ -1151,7 +1145,7 @@ public class AgentTurnService {
                     + "为避免继续消耗时间，先就现有信息回答；如果你需要更精确的结果，"
                     + "可以把条件说得更具体一些（例如明确的区域、日期或单号）。";
             log.warn("[Agent] 工具调用往返超出上限，已优雅收口 messageId={}", messageId);
-            // 【M5 修复（第二条路径）】"优雅收口"只有在**确实有正文**时才算成功。
+            // 【M5 修复（第二条路径）】"优雅收口"只有在确实有正文时才算成功。
             // 独立验证指出这个分支与 finishSuccessfully 都会在 answer 为空时写 COMPLETED：
             // 实测 604 条 COMPLETED 里 32 条正文为空（5.3%），用户看到"成功但空白"的气泡，
             // 既没内容也看不出失败，只能反复重问。
@@ -1261,7 +1255,7 @@ public class AgentTurnService {
     /**
      * 起一条重放连接（不占配额：调用点在第 2 步幂等预检，早于限流与并发计数）。
      *
-     * <p>重放的清理**不递减** user/global 并发计数 —— 因为这条路径从未申请过它们。
+     * <p>重放的清理不递减 user/global 并发计数，因为这条路径从未申请过它们。
      */
     private SseEmitter startReplay(AgentMessage existing, LoginUser user, String notice) {
         log.info("[Agent] 检测到重复轮次 turnId={}，重放既有回答 messageId={}（不消耗限流配额）",
@@ -1309,7 +1303,7 @@ public class AgentTurnService {
         } catch (Exception e) {
             log.warn("[Agent] 重放失败 messageId={}: {}", existing.getId(), e.getMessage());
         } finally {
-            // 注意：这里**不递减**并发计数 —— 重放路径在限流/计数之前就返回了，
+            // 注意：这里不递减并发计数 —— 重放路径在限流/计数之前就返回了，
             // 从未 increment。递减会造成计数变成负数，进而放宽别人的并发上限
             // （一个很隐蔽的"越用越宽松"缺陷）。
             closeChannel(existing.getId());
@@ -1330,11 +1324,9 @@ public class AgentTurnService {
     /**
      * 实例级心跳 tick。
      *
-     * <h3>为什么不再"每个连接一个定时任务"</h3>
      * 改造前每条连接都会注册一个 {@code scheduleWithFixedDelay} 心跳任务，
      * 1000 条连接就是 1000 个任务对象挂在 4 个线程的调度器上；
-     * 更要命的是任务体里直接 {@code emitter.send(comment)} 是<b>阻塞写</b> ——
-     * 4 个慢客户端就能占满 4 个调度线程，让<b>所有</b>连接的心跳停掉，
+     * 更要命的是任务体里直接 {@code emitter.send(comment)} 是<b>阻塞写</b>，* 4 个慢客户端就能占满 4 个调度线程，让<b>所有</b>连接的心跳停掉，
      * 进而被中间代理批量断连。
      *
      * <p>现在只有一个 tick：遍历在线连接，把 ping 帧<b>非阻塞入队</b>（各自通道负责写）。
@@ -1497,7 +1489,7 @@ public class AgentTurnService {
     }
 
     /**
-     * 把一帧推给该消息上的**全部**在线连接。
+     * 把一帧推给该消息上的全部在线连接。
      *
      * <p>找不到通道（连接已关闭/从未建立）不是错误：事件已经进了 Redis 缓冲，
      * 客户端重连时按 lastEventId 补齐即可。
@@ -1537,10 +1529,10 @@ public class AgentTurnService {
     }
 
     /**
-     * 关闭该消息上的**全部**连接（先把各自队列里剩余的帧写完，保证用户能看到完整结果）。
+     * 关闭该消息上的全部连接（先把各自队列里剩余的帧写完，保证用户能看到完整结果）。
      *
      * <p>轮次结束时调用：此刻所有还在看的连接都应该收到终态事件并正常关闭。
-     * 幂等 —— 重复调用只会遍历到一个空集合。
+     * 幂等，重复调用只会遍历到一个空集合。
      */
     private void closeChannel(Long messageId) {
         for (SseChannel channel : channelsOf(messageId)) {
@@ -1663,8 +1655,7 @@ public class AgentTurnService {
      *
      * <p>心跳每 15 秒必然写出一帧，因此空闲超过阈值只可能是两种情况：
      * 客户端 TCP 已断但我们还没察觉，或者写入器卡在一个不再读取的 socket 上。
-     * 两种情况都应该断开该连接（前端会重连续传），把虚拟线程与队列内存释放掉 ——
-     * 否则 1000 条连接的场景下，假死连接会慢慢累积成资源泄漏。
+     * 两种情况都应该断开该连接（前端会重连续传），把虚拟线程与队列内存释放掉，* 否则 1000 条连接的场景下，假死连接会慢慢累积成资源泄漏。
      */
     private void reapIdleChannels() {
         long idleLimit = properties.getStream().getChannelIdleTimeoutSeconds() * 1000L;

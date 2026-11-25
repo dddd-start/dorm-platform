@@ -13,9 +13,9 @@ import java.util.stream.Collectors;
  *
  * <p>三级权限模型的最小实现：
  * <ul>
- *   <li>{@link #SUPER_ADMIN} —— 总管理员：全部区域、全部房源、全局配置与审计</li>
- *   <li>{@link #REGION_ADMIN} —— 区域管理员：仅本区域的审批、分房、房源维护</li>
- *   <li>{@link #EMPLOYEE} —— 员工：提交/查看自己的申请、查房源、办理入住退房</li>
+ *   <li>{@link #SUPER_ADMIN}，总管理员：全部区域、全部房源、全局配置与审计</li>
+ *   <li>{@link #REGION_ADMIN}，区域管理员：仅本区域的审批、分房、房源维护</li>
+ *   <li>{@link #EMPLOYEE}，员工：提交/查看自己的申请、查房源、办理入住退房</li>
  * </ul>
  * 角色决定「功能权限」，区域决定「数据权限」，两者在
  * {@code com.overseas.dorm.domain.support.DataScope} 中组合校验。

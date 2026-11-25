@@ -13,43 +13,18 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * 单条 SSE 连接的有界出站通道（write-behind）。
  *
- * <h2>为什么必须有这一层</h2>
- * 改造前，SSE 帧是**由生产者线程直接写出去的**：
- * <ul>
- *   <li>生成线程（原线程池上限 64）在每次 publish 时调用 {@code emitter.send(...)}；</li>
- *   <li>Redis Pub/Sub 的监听回调也直接调用 {@code emitter.send(...)}；</li>
- *   <li>心跳任务同样直接写。</li>
- * </ul>
- * {@code emitter.send()} 是<b>阻塞写</b>：客户端不读（弱网、切后台、假死）时，
- * TCP 发送窗口填满，写线程就一直卡在那里。后果是<b>队头阻塞（head-of-line blocking）</b>：
- * <ol>
- *   <li>一个慢客户端占住一个生成线程 —— 64 个慢客户端就能让整个实例停止生成；</li>
- *   <li>Pub/Sub 监听容器默认只有一个分发线程 —— <b>一个慢客户端就能让全实例的续传全部停摆</b>；</li>
- *   <li>心跳任务共用一个 4 线程调度器 —— 4 个慢客户端就能让所有连接的心跳停掉。</li>
- * </ol>
- * 这三条在 30 并发下完全看不出来，到 1000 并发就是"请求把容器 hang 住"。
+ * <p>生产者（生成线程 / Pub-Sub 监听 / 心跳）只调用 {@link #offer}，由该连接专属的
+ * 虚拟线程写入器取帧并调用 {@code emitter.send()}。这样把阻塞写隔离到每条连接，
+ * 慢客户端只占用自己的队列与线程，不会拖住共享的生成线程或 Pub/Sub 分发线程。
  *
- * <h2>改造后的模型</h2>
- * <pre>
- *   生产者（生成 / Pub-Sub / 心跳）── offer() ──▶ 有界队列 ──▶ 本连接专属写入器（虚拟线程）──▶ emitter.send()
- *                 非阻塞、永不等待                  满则丢弃连接
- * </pre>
- * 关键性质：
+ * <p>契约：
  * <ul>
- *   <li><b>生产者永不阻塞</b>：{@link #offer} 是纯内存入队，队列满时立刻返回 false，
- *       由调用方决定"放弃这条连接"（而不是拖垮整台机器）；</li>
- *   <li><b>连接之间互不影响</b>：每个连接有自己的写入器，一个慢客户端只卡住它自己的
- *       虚拟线程（约几 KB 内存），不影响其它 999 条连接；</li>
- *   <li><b>写入器用虚拟线程</b>：1000 条连接 = 1000 个虚拟线程，而不是 1000 个平台线程
- *       （平台线程每个 1MB 栈，1000 个就是 1GB 栈内存，这才是"容器被打挂"的直接原因）；</li>
- *   <li><b>内存有界</b>：队列容量固定，最坏内存 = 连接数 × 容量 × 单帧大小，可精确估算。</li>
+ *   <li>{@link #offer} 不阻塞：队列满返回 {@code false}，由调用方终止该连接；</li>
+ *   <li>队列只有一个消费者（写入器），其余线程只投递；</li>
+ *   <li>关闭投递哨兵帧而非 {@code interrupt}，已入队的帧（含终态）按序写完。</li>
  * </ul>
  *
- * <h2>慢客户端为什么要"丢弃"而不是等待</h2>
- * 断线可续传（Redis Stream 保存了完整事件历史，前端带 lastEventId 重连即可补齐），
- * 因此<b>放弃一条卡住的连接是安全的</b>，而让它拖住共享资源是不安全的。
- * 这就是高并发长连接服务的核心权衡：宁可断开一个用户让他重连，
- * 也不能让一个用户影响其余 999 个。
+ * <p>背压与慢客户端的完整取舍见 {@code docs/agent-sse-design.md} §5。
  */
 @Slf4j
 public final class SseChannel implements AutoCloseable {
@@ -69,7 +44,7 @@ public final class SseChannel implements AutoCloseable {
          * 收尾哨兵：由 {@link #close()} 入队。
          *
          * <p>用它而不是"给写入器线程发 interrupt"，是因为 interrupt 会让写入器
-         * 立即退出循环，**队列里还没写出的帧会被丢掉** —— 这正是"客户端收不到终态事件"
+         * 立即退出循环，队列里还没写出的帧会被丢掉，这正是"客户端收不到终态事件"
          * 那类失败的根因（DONE 已入队，但连接先被关掉了）。
          * 哨兵保证写入器按顺序把哨兵之前的帧全部写完后才退出。
          */
@@ -105,10 +80,8 @@ public final class SseChannel implements AutoCloseable {
     /**
      * 本连接已写出的最大事件序号（防御性去重）。
      *
-     * <h3>为什么还要保留判重</h3>
      * 改造前，同一实例的续传连接既有生成线程直投、又有 Redis Pub/Sub 转发，
-     * 两条路径指向同一个连接，事件被投递两次、两个写者交错写 socket ——
-     * 实测拼接文本翻倍（落库 137 字、拼接 274 字）。
+     * 两条路径指向同一个连接，事件被投递两次、两个写者交错写 socket，* 实测拼接文本翻倍（落库 137 字、拼接 274 字）。
      *
      * <p>现在两条路径仍然都存在（跨实例续传必须走 Pub/Sub，首次连接必须走直投），
      * 但 {@link #offer} 用 {@link #pendingBySeq} 按 seq 重排：
@@ -121,7 +94,6 @@ public final class SseChannel implements AutoCloseable {
      *       静默丢弃比重复更可怕。</li>
      * </ul>
      *
-     * <p>事件序号在一条流内单调且唯一，因此"序号不大于已写出的最大值"即为重复。
      */
     private final AtomicLong lastWrittenSeq = new AtomicLong(-1);
 
@@ -254,7 +226,7 @@ public final class SseChannel implements AutoCloseable {
         }
         // 队列满 = 这个客户端已经跟不上生成速度（或根本没在读）。
         //
-        // 保护动作必须做（不能让一个慢客户端拖垮生产者），但**不能静默截断**：
+        // 保护动作必须做（不能让一个慢客户端拖垮生产者），但不能静默截断：
         // 改造前这里直接 close()，连接在没有终态事件的情况下被关掉 ——
         // 客户端只看到"流莫名其妙结束了"，不知道应该重连续传，
         // 表现为压测里"HTTP 200 但没有终态事件"的那一类失败。
@@ -285,7 +257,7 @@ public final class SseChannel implements AutoCloseable {
                 Frame frame = queue.poll(30, TimeUnit.SECONDS);
                 if (frame == null) {
                     // 空闲：若已请求收尾则退出，否则等下一帧（心跳由实例级 tick 入队）。
-                    // 注意这里**不能**用 closed 作为退出条件 —— close() 会设置 closed
+                    // 注意这里不能用 closed 作为退出条件 —— close() 会设置 closed
                     // 来拒绝新帧，但队列里已有的帧（尤其是终态 DONE）必须写完。
                     if (closingAfterDrain.get()) {
                         break;
@@ -335,7 +307,7 @@ public final class SseChannel implements AutoCloseable {
     /**
      * 本轮正常结束：请求优雅收尾。
      *
-     * <p>刻意**不在这里排空队列** —— 队列的消费者只能是写入器线程。
+     * <p>刻意不在这里排空队列，队列的消费者只能是写入器线程。
      * 之前这个方法在调用方（生成）线程上轮询同一个队列，与写入器形成两个消费者，
      * 是"末帧丢失"竞态的另一半原因。
      */
@@ -353,16 +325,14 @@ public final class SseChannel implements AutoCloseable {
     }
 
     /**
-     * 优雅收尾：拒绝新帧，并让写入器把队列里已有的帧（含终态 DONE）**按顺序写完后**再关闭连接。
+     * 优雅收尾：拒绝新帧，并让写入器把队列里已有的帧（含终态 DONE）按顺序写完后再关闭连接。
      *
-     * <h3>为什么不再 interrupt 写入器</h3>
-     * 原实现 `close()` 直接 `writer.interrupt()` —— 写入器立刻退出循环，
+     * 原实现 `close()` 直接 `writer.interrupt()`，写入器立刻退出循环，
      * 队列里尚未写出的帧被永久丢弃。表现是：服务端日志干干净净（没有任何异常），
      * 但客户端"流结束了却没有终态事件"，回答看起来被截断。
      * 实测在 1000 并发下每轮有 2~5 个请求命中这个竞态。
      *
-     * <p>另外，原先的 `drainAndComplete()` 会在**调用方线程**上主动轮询同一个队列 ——
-     * 与写入器形成"两个消费者"，既有交错写入风险，也会在 close 时丢末帧。
+     * <p>另外，原先的 `drainAndComplete()` 会在调用方线程上主动轮询同一个队列，* 与写入器形成"两个消费者"，既有交错写入风险，也会在 close 时丢末帧。
      * 现在队列只有一个所有者（写入器），调用方只负责"投递哨兵"。
      */
     @Override

@@ -20,10 +20,10 @@ public interface RagRetrievalLogMapper extends BaseMapper<RagRetrievalLog> {
      *
      * <p>指标含义：
      * <ul>
-     *   <li>{@code no_hit_rate} —— 「一条都没检索到」的比例，
+     *   <li>{@code no_hit_rate}，「一条都没检索到」的比例，
      *       直接反映知识库覆盖缺口，是最该盯的指标；</li>
-     *   <li>{@code avg_top_score} —— 最高相似度均值，用于校准 minScore；</li>
-     *   <li>{@code dislike_rate} —— 命中了但用户不满意，说明是答案组织问题而非召回问题。</li>
+     *   <li>{@code avg_top_score}，最高相似度均值，用于校准 minScore；</li>
+     *   <li>{@code dislike_rate}，命中了但用户不满意，说明是答案组织问题而非召回问题。</li>
      * </ul>
      */
     @Select("""
@@ -63,11 +63,11 @@ public interface RagRetrievalLogMapper extends BaseMapper<RagRetrievalLog> {
                        @Param("feedback") com.overseas.dorm.common.enums.FeedbackRating feedback);
 
     /**
-     * 按消息回写反馈 —— 质量闭环的关键一环。
+     * 按消息回写反馈，质量闭环的关键一环。
      *
      * <p>为什么必须有这个方法：运维看板的"点踩率"读的是
      * {@code rag_retrieval_log.feedback}，而用户的点赞/点踩此前只写进
-     * {@code agent_feedback}，两张表之间没有打通 —— 结果是
+     * {@code agent_feedback}，两张表之间没有打通，结果是
      * <b>点踩率永远是 0</b>，"哪个问题答得不好"这条最重要的运营线索彻底丢失。
      * 一条检索可能对应多条日志（同一轮多次检索），因此按 message_id 全量更新。
      */

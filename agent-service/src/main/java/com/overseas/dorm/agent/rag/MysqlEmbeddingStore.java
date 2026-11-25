@@ -31,16 +31,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
- * 基于 MySQL 的向量存储 —— 自己实现 {@link EmbeddingStore} 而不是用现成的内存实现。
+ * 基于 MySQL 的向量存储，自己实现 {@link EmbeddingStore} 而不是用现成的内存实现。
  *
- * <h3>为什么不直接用 InMemoryEmbeddingStore</h3>
- * <ol>
- *   <li>重启即丢，每次启动都要重新跑一遍全量嵌入（几千个切片 = 几分钟启动时间）；</li>
- *   <li>多实例部署时每个实例各存一份，内存浪费且内容可能不一致；</li>
- *   <li>无法审计"这条答案到底基于知识库里的哪个片段" —— 而这是 RAG 可解释性的基础。</li>
- * </ol>
- *
- * <h3>为什么检索走内存索引而不是每次查库</h3>
  * 这是一个显式的取舍，写在这里以免后来者误以为是"偷懒"：
  * <pre>
  *   查库暴力检索：每次检索回传几千行 MEDIUMBLOB（几十 MB），
@@ -51,13 +43,11 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * 代价是内存占用（1000 切片 × 512 维 × 4B ≈ 2MB，完全可接受）与
  * 写后需要刷新索引。刷新由 {@link #reload()} 完成，知识库重建时调用。
  *
- * <h3>规模增长后的演进路径</h3>
  * 当切片数超过十万级时，这个实现会成为瓶颈。演进方式是：
  * 把 {@link #search} 的实现换成「先按元数据过滤缩小候选集，
  * 再用 HNSW/IVF 索引」或者直接把向量迁到专用向量库
  * （Milvus / Qdrant / pgvector / Redis Search），
- * <b>上层的 RagService 与工具体系完全不需要改动</b> ——
- * 这正是面向接口编程在这里的真正价值。
+ * <b>上层的 RagService 与工具体系完全不需要改动</b>，* 这正是面向接口编程在这里的真正价值。
  */
 @Slf4j
 @Component
@@ -176,7 +166,7 @@ public class MysqlEmbeddingStore implements EmbeddingStore<TextSegment> {
      * <p>过滤器的处理方式值得说明：LangChain4j 的 {@link Filter} 是一个表达式树，
      * 要完整支持它需要引入 {@code langchain4j-core} 的 filter 解析工具。
      * 本项目用到的过滤维度只有两个（区域、分类），因此这里做<b>显式的字段提取</b>
-     * 而不是通用表达式求值 —— 代码更好读，也避免了对 Filter 内部结构的依赖。
+     * 而不是通用表达式求值，代码更好读，也避免了对 Filter 内部结构的依赖。
      * 如果将来需要组合条件（AND/OR/嵌套），再换成官方提供的求值器。
      */
     @Override
@@ -231,13 +221,13 @@ public class MysqlEmbeddingStore implements EmbeddingStore<TextSegment> {
      * 元数据过滤求值。
      *
      * <p>这里实现对 LangChain4j {@link Filter} 表达式树的<b>递归求值</b>，
-     * 而不是用 {@code toString()} 做字符串匹配 —— 后者看起来能跑，
+     * 而不是用 {@code toString()} 做字符串匹配，后者看起来能跑，
      * 但只要条件的值里出现 "regionId" 这样的字面量，过滤结果就会莫名其妙地错乱，
      * 而且极难排查。
      *
      * <p>业务上有一条特殊规则：{@code regionId} 为 {@code null} 的切片
      * 表示「全局文档」（例如集团统一的入住流程规定），
-     * 它在任何区域的检索里都应该命中 —— 否则员工在新加坡问流程时会查不到集团制度。
+     * 它在任何区域的检索里都应该命中，否则员工在新加坡问流程时会查不到集团制度。
      */
     private boolean passesFilter(IndexEntry entry, Filter filter) {
         if (filter == null) {

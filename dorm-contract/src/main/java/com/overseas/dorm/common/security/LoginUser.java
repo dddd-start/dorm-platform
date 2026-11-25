@@ -17,7 +17,7 @@ import java.io.Serializable;
  * <ul>
  *   <li>Controller / Service 通过 {@code UserContext.require()} 获取；</li>
  *   <li>Agent 工具的 {@code userId} 一律从此上下文取，
- *       <b>绝不</b>接受模型或请求体传入的用户标识 —— 这是防越权的根防线；</li>
+ *       <b>绝不</b>接受模型或请求体传入的用户标识，这是防越权的根防线；</li>
  *   <li>异步/流式线程通过显式传递 {@code LoginUser} 快照来继承身份，
  *       而不是依赖 ThreadLocal 自动传播（后者在流式回调里并不可靠）。</li>
  * </ul>
@@ -49,7 +49,7 @@ public class LoginUser implements Serializable {
      * 签发令牌时的认证版本（{@code dorm:auth:epoch:{userId}}；键不存在时为 0）。
      *
      * <p>拦截器每个请求都会把它与 Redis 里的当前值比对：<b>不相等即视为令牌已失效</b>。
-     * 这样"禁用账号 / 重置口令 / 角色或区域变更 / 强制下线"都能对**已签发的令牌**立即生效，
+     * 这样"禁用账号 / 重置口令 / 角色或区域变更 / 强制下线"都能对已签发的令牌立即生效，
      * 而不是等到 token 自然过期（最长 12 小时）。
      */
     private Long authEpoch;

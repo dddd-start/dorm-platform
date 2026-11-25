@@ -25,7 +25,6 @@ import java.util.List;
 /**
  * Agent 记忆服务：短期与长期记忆的分层实现。
  *
- * <h3>两层的职责边界</h3>
  * <table>
  *   <tr><th>层</th><th>存储</th><th>内容</th><th>生命周期</th></tr>
  *   <tr>
@@ -38,15 +37,12 @@ import java.util.List;
  *   </tr>
  * </table>
  *
- * <h3>为什么长期记忆不用向量检索</h3>
  * 常见做法是把长期记忆也做成向量库做语义召回。但本系统的长期记忆
  * 是<b>结构化偏好</b>（偏好房型、常去区域、是否介意合住），
  * 条数极少（每人 20 条以内）且有明确的 key。
- * 这种场景下精确的 key 覆盖 + 重要度排序，比向量召回更准、更快、更可控 ——
- * 向量召回反而可能因为"语义相近"把「不介意合住」和「介意合住」混在一起，
+ * 这种场景下精确的 key 覆盖 + 重要度排序，比向量召回更准、更快、更可控，* 向量召回反而可能因为"语义相近"把「不介意合住」和「介意合住」混在一起，
  * 造成难以排查的错误。技术选型要服务于数据特征，而不是反过来。
  *
- * <h3>长期记忆怎么被用起来</h3>
  * 在拼装 System Prompt 时，把用户的画像与偏好渲染成一段自然语言，
  * 例如：「该用户为国际业务一部员工，常驻东南亚，偏好单人间，不介意与同事合住。」
  * 模型据此就不再需要每轮都问一遍偏好。
@@ -75,7 +71,7 @@ public class AgentMemoryService {
     /**
      * 渲染长期记忆为可拼入 System Prompt 的文本。
      *
-     * <p>返回空字符串表示没有记忆 —— 调用方需要判断，避免把空段落拼进去
+     * <p>返回空字符串表示没有记忆，调用方需要判断，避免把空段落拼进去
      * 浪费 token（每一轮都浪费，累计起来相当可观）。
      */
     public String renderLongTermMemory(Long userId) {
@@ -102,7 +98,7 @@ public class AgentMemoryService {
         return sb.toString();
     }
 
-    /** 渲染用户基本画像（角色、部门、所属区域）—— 这部分事实不需要用户告知。 */
+    /** 渲染用户基本画像（角色、部门、所属区域），这部分事实不需要用户告知。 */
     public String renderUserProfile(Long userId) {
         UserVO user;
         try {
@@ -195,28 +191,22 @@ public class AgentMemoryService {
     /**
      * 会话变长时为较早的消息生成摘要。
      *
-     * <h3>为什么需要它</h3>
-     * 短期记忆只读最近 N 条消息，超出窗口的内容会被彻底丢弃 ——
-     * 用户在第 3 轮说过的关键约束（"我要单人间""我对猫毛过敏"），
+     * 短期记忆只读最近 N 条消息，超出窗口的内容会被彻底丢弃，* 用户在第 3 轮说过的关键约束（"我要单人间""我对猫毛过敏"），
      * 到第 30 轮就"忘记"了。摘要把超窗部分压缩成一段话保留下来。
      *
-     * <h3>为什么此前是死代码</h3>
      * 这个能力此前只有"存储"（{@code updateConversationSummary}）与"读取"
      * （{@code conversationSummary}）两半，<b>没有任何地方生成摘要</b>：
      * 配置项 {@code dorm.agent.memory.summarize-after-turns} 也从未被读取。
      * 于是 {@code agent_conversation.summary} 永远是 null、会话列表里的
      * {@code hasSummary} 永远是 false。现已接入轮次结束流程并启用了该配置。
      *
-     * <h3>为什么异步、为什么失败要静默</h3>
      * 摘要需要一次额外的模型调用：它必须<b>异步执行</b>（不拖慢用户感知的响应）、
      * <b>失败静默</b>（摘要失败绝不能让用户的对话失败）。
      * 调用方用 {@code agentTaskExecutor} 提交，这里再兜一层 try/catch。
      *
-     * <h3>刷新节奏</h3>
      * 触发阈值 = 配置的"超过多少轮"换算成消息条数（用户 + 助手各一条）；
      * 已有摘要时按同一个步长刷新，避免每一轮都重新摘要（那会持续烧 token）。
-     * 用取模判断而<b>不新增数据库列</b>记录"上次摘要到哪一条" ——
-     * 为这个辅助功能加一列并做迁移，收益不抵成本。
+     * 用取模判断而<b>不新增数据库列</b>记录"上次摘要到哪一条"，* 为这个辅助功能加一列并做迁移，收益不抵成本。
      */
     public void summarizeIfNeeded(Long conversationId) {
         try {
@@ -282,7 +272,7 @@ public class AgentMemoryService {
      * 清理已过期的长期记忆。
      *
      * <p>加 {@code @Scheduled} 的原因：这个方法此前存在但<b>从未被调用</b>，
-     * 意味着带过期时间的记忆永远不会被删除 —— 表只增不减。
+     * 意味着带过期时间的记忆永远不会被删除，表只增不减。
      * 每天凌晨执行一次即可，单次批量有限，不会对数据库造成压力。
      */
     @org.springframework.scheduling.annotation.Scheduled(
@@ -305,8 +295,7 @@ public class AgentMemoryService {
      * 用户可自助查看与清除的长期记忆列表。
      *
      * <p>下发 {@code typeLabel} 而不只是 {@code type}：给用户看的界面不该出现
-     * {@code PREFERENCE} 这种内部枚举名。中文映射属于后端职责 ——
-     * 放前端意味着每加一个记忆类型都要同步改前端，且必然有漏掉的一次。
+     * {@code PREFERENCE} 这种内部枚举名。中文映射属于后端职责，* 放前端意味着每加一个记忆类型都要同步改前端，且必然有漏掉的一次。
      */
     public List<AgentMemoryVO> listMemories(Long userId) {
         return memoryMapper.selectTop(userId, MEMORY_LIST_LIMIT).stream()
@@ -358,7 +347,7 @@ public class AgentMemoryService {
      *
      * <p>由 {@link #purgeExpiredScheduled()} 每天凌晨调用。
      * 补充说明为什么需要调度：这个方法此前<b>存在但从未被任何地方调用</b>，
-     * 意味着带过期时间的长期记忆永远删不掉 —— 表只增不减。
+     * 意味着带过期时间的长期记忆永远删不掉，表只增不减。
      */
     @Transactional
     public int purgeExpired() {

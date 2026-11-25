@@ -11,9 +11,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  *
  * <p>重点验证三件事：
  * <ol>
- *   <li>同一个明文两次加密得到<b>不同</b>的密文（IV 随机化）—— 否则等于明文；</li>
+ *   <li>同一个明文两次加密得到<b>不同</b>的密文（IV 随机化），否则等于明文；</li>
  *   <li>反过来都能解回原值（可用性）；</li>
- *   <li>HMAC 摘要<b>稳定</b>（同一明文同一密钥结果一致）—— 否则无法按手机号检索。</li>
+ *   <li>HMAC 摘要<b>稳定</b>（同一明文同一密钥结果一致），否则无法按手机号检索。</li>
  * </ol>
  */
 class CryptoUtilTest {

@@ -18,13 +18,11 @@ import java.util.function.Supplier;
  *
  * <p>三个必须做对的细节（做错就会变成「看起来能用、高并发下偶发超卖」）：
  * <ol>
- *   <li><b>加锁用 SET NX PX</b>，而不是先 SETNX 再 EXPIRE ——
- *       后者在两条命令之间宕机就会留下永不过期的死锁；</li>
+ *   <li><b>加锁用 SET NX PX</b>，而不是先 SETNX 再 EXPIRE，*       后者在两条命令之间宕机就会留下永不过期的死锁；</li>
  *   <li><b>解锁必须校验持有者</b>：用 Lua 脚本「比对 value 再删除」，
  *       否则 A 把锁超时释放后、B 拿到锁，A 的 finally 会把 B 的锁删掉；</li>
  *   <li><b>必须有兜底</b>：锁只是「减少冲突」，真正的正确性由数据库的
- *       条件更新（{@code WHERE status='IDLE'}）保证 ——
- *       分布式锁失效时业务仍然不能错，这是分层的意义。</li>
+ *       条件更新（{@code WHERE status='IDLE'}）保证，*       分布式锁失效时业务仍然不能错，这是分层的意义。</li>
  * </ol>
  */
 @Slf4j

@@ -12,9 +12,8 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 工具目录一致性测试 —— 用测试守住「每个工具都必须被显式分类」这个约定。
+ * 工具目录一致性测试，用测试守住「每个工具都必须被显式分类」这个约定。
  *
- * <h3>为什么这个测试是必要的</h3>
  * {@link ToolCatalog} 的读写分类决定了两个安全行为：
  * <ul>
  *   <li>只读工具允许同轮重复调用去重；</li>

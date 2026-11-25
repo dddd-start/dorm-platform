@@ -27,32 +27,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * 受控工具提供者 —— 本系统所有工具能力的统一入口。
+ * 受控工具提供者，本系统所有工具能力的统一入口。
  *
- * <h3>为什么要在 ToolProvider 这一层做文章</h3>
  * 如果把审计、去重、重试、熔断的代码写进每一个 {@code @Tool} 方法里，
- * 结果一定是：有人写了、有人忘了、有人写错顺序。而这些问题在正常路径下
- * 完全看不出来，只在异常/并发时才暴露。
  *
- * <p>用自定义 {@link ToolProvider} 把 {@link ToolExecutor} 包一层，
- * 所有横切关注点就<b>只实现一次、对所有工具同时生效</b>，
- * 而且业务代码里的工具方法可以保持干净 —— 只有业务逻辑。
  *
- * <h3>这一层做了四件事</h3>
- * <ol>
- *   <li><b>同轮去重</b>：只读工具用 {@code (工具名 + 参数)} 指纹查缓存，
- *       命中直接返回 —— 抑制模型"不甘心地重复查询"；</li>
- *   <li><b>有限重试</b>：只对<b>只读</b>工具、且只对瞬时故障（连接类异常）重试 1 次。
- *       写工具绝不自动重试 —— 重试一个已经成功的写操作会造成重复业务单据；</li>
- *   <li><b>熔断</b>：某个工具连续失败到阈值后直接快速失败，
- *       避免每次对话都卡在一个坏工具上（比如某个 SQL 因为数据问题必然报错）；</li>
- *   <li><b>审计</b>：记录每一次调用的参数、结果、耗时、是否被去重、是否权限拒绝。</li>
- * </ol>
  *
- * <h3>异常如何回灌给模型</h3>
- * 工具抛出的 {@link BizException} 里带着 {@code agentHint}（给模型的纠偏提示）。
- * 这一层把它渲染成一段文字返回给模型，模型据此换一种方式回答或换条路径，
- * 而不是把 Java 堆栈当成工具结果 —— 后者会让模型编出离谱的解释。
  */
 @Slf4j
 public class GuardedToolProvider implements ToolProvider {
@@ -62,9 +42,8 @@ public class GuardedToolProvider implements ToolProvider {
     /**
      * 用于"用户已停止 → 不再执行任何工具"。
      *
-     * <p>为什么需要它：H10 的取消发生在模型流的中途，而工具是由模型返回的 tool_calls 驱动的 ——
-     * "不再消费 token"并不能阻止 LangChain4j 继续执行工具。若不在这里拦，
-     * 用户点了停止之后**写类工具（如提交申请）仍可能真的执行**：那就不再是"显示问题"，
+     * <p>为什么需要它：H10 的取消发生在模型流的中途，而工具是由模型返回的 tool_calls 驱动的，* "不再消费 token"并不能阻止 LangChain4j 继续执行工具。若不在这里拦，
+     * 用户点了停止之后写类工具（如提交申请）仍可能真的执行：那就不再是"显示问题"，
      * 而是"用户明确喊停之后系统还是替他把单子提交了"。
      */
     private final com.overseas.dorm.agent.stream.AgentStreamBuffer streamBuffer;
@@ -160,10 +139,8 @@ public class GuardedToolProvider implements ToolProvider {
         /**
          * 在「发起本轮对话的用户 / 链路 / 轮次」上下文里执行工具。
          *
-         * <h3>为什么必须做这件事（一个真实踩过的坑）</h3>
          * 工具不是在我们发起调用的那个线程上执行的，而是在模型 HTTP 客户端的读流线程里
          * （本项目已固定为 {@code agent-model-stream-*} 虚拟线程，见
-         * {@code VirtualThreadJdkHttpClient}）。因此：
          * <pre>
          *   - UserContext 为空 → 工具里的 UserContext.require() 会抛 401；
          *   - AgentTurnContext 为空 → 工具审计的 conversationId 记成 0、turnId 记成 null，
@@ -171,7 +148,7 @@ public class GuardedToolProvider implements ToolProvider {
          *   - TraceContext 为空 → 日志里的 traceId 串不上，排查时断链。
          * </pre>
          * 这里通过 chatMemoryId（等于 conversationId）从注册表取回上下文并显式恢复，
-         * 保证工具在"正确的身份"下运行 —— 这也是「AI 绝不越权」能够成立的前提：
+         * 保证工具在"正确的身份"下运行，这也是「AI 绝不越权」能够成立的前提：
          * 工具用的身份来自服务端注册表，而不是模型提供的任何参数。
          */
         private String withTurnContext(Object memoryId, java.util.function.Supplier<String> action) {

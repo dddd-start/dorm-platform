@@ -10,7 +10,7 @@ import java.io.Serializable;
  *   <li>字段名、类型、必填性都由编译器保证，前端拿到的东西不会因为有人
  *       改了一个 {@code put} 的 key 而悄悄变了形状；</li>
  *   <li>IDE 与调用方能直接跳转、重构、补全；</li>
- *   <li>Swagger 能自动生成准确的 schema —— {@code Map<String, Object>}
+ *   <li>Swagger 能自动生成准确的 schema，{@code Map<String, Object>}
  *       在接口文档里只能显示成"一个对象"，等于没有文档。</li>
  * </ul>
  *

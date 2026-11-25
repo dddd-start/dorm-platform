@@ -38,22 +38,19 @@ import static org.mockito.Mockito.when;
 /**
  * 工具层的横切策略：<b>哪一条真的生效了，哪一条没有</b>。
  *
- * <h3>本章最重要的产出：一个"没生效"的结论，以及它的根因</h3>
  * {@link GuardedToolProvider} 的类注释声明了四件事：同轮去重、有限重试、熔断、异常转提示。
  * 写测试之前，我以为四条都能验；写完之后发现<b>只有第一条是活的</b>。
  *
  * <p>根因不在守卫层，而在它委托的执行器：守卫层用
  * {@code new DefaultToolExecutor(toolObject, method)} 构造执行器，
  * 而这个构造器把 {@code propagateToolExecutionExceptions} 留在了默认值
- * {@code false} —— 于是 LangChain4j 会把工具抛出的异常<b>吞掉，
+ * {@code false}，于是 LangChain4j 会把工具抛出的异常<b>吞掉，
  * 把异常消息当成"工具结果"返回</b>。守卫层拿到的是一次"成功"的返回值，
  * 它的 catch 分支自然永远不执行。
  *
- * <p>本类因此是一组<b>特征化测试</b>（characterization test）：它断言的是
  * <b>当前的真实行为</b>，包括那三条不生效的策略。这样做的价值是：
  * 将来有人修好它（把 {@code propagateToolExecutionExceptions(true)} 打开），
- * 这些断言会红，修改者被迫回来读这段注释、更新本章与文档 ——
- * 而不是让一处安全相关的行为变化悄悄溜过。
+ * 这些断言会红，修改者被迫回来读这段注释、更新本章与文档，* 而不是让一处安全相关的行为变化悄悄溜过。
  *
  * <p>照项目 constitution C3（不达标项必须留在文档里，不得静默删除），
  * 这个缺口记在：本章 README「常见坑」、`docs/milestone-04-*.md`、`PROGRESS.md`。

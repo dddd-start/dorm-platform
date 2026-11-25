@@ -9,8 +9,7 @@ import java.util.Arrays;
  *
  * <p>同一个枚举服务两处：{@code agent_feedback.rating} 与
  * {@code rag_retrieval_log.feedback}。两者语义相同（用户对某次回答/检索是否满意），
- * 用同一个枚举能避免"一边叫 LIKE 一边叫 GOOD"这类不一致 ——
- * 而这类不一致在统计时会静默少算一半数据。
+ * 用同一个枚举能避免"一边叫 LIKE 一边叫 GOOD"这类不一致，* 而这类不一致在统计时会静默少算一半数据。
  */
 @Getter
 public enum FeedbackRating {

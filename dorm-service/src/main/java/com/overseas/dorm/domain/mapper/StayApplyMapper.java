@@ -12,7 +12,7 @@ import java.util.Map;
 /**
  * 入住申请数据访问（含状态机相关的过期扫描与状态计数）。
  *
- * <p>状态值由调用方传入枚举名，不在 SQL 里写字面量 —— 枚举改名时
+ * <p>状态值由调用方传入枚举名，不在 SQL 里写字面量，枚举改名时
  * SQL 会照跑不报错，只会让定时任务静默失效（"过期申请永远不释放床位"）。
  */
 @Mapper
@@ -57,7 +57,7 @@ public interface StayApplyMapper extends BaseMapper<StayApply> {
      *
      * <p>状态值由调用方传入枚举名（{@code ApplyStatus.APPROVED.name()}），
      * 而不是在 SQL 里写 {@code 'APPROVED'}：避免"枚举改了、SQL 没改"导致
-     * 定时任务永远扫不到数据 —— 这类问题只表现为"功能不生效"，日志里毫无线索。
+     * 定时任务永远扫不到数据，这类问题只表现为"功能不生效"，日志里毫无线索。
      */
     @Select("""
             SELECT * FROM stay_apply

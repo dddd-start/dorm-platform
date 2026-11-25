@@ -20,8 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * 跨线程上下文：<b>工具在别的线程上跑，凭什么还能拿到正确的身份与轮次</b>。
  *
- * <h3>这是"可靠流式"和"工具不越权"共同的地基</h3>
- * LangChain4j 的工具执行与流式回调**不在我们发起调用的线程上**，
+ * LangChain4j 的工具执行与流式回调不在我们发起调用的线程上，
  * 而在模型 HTTP 客户端的读流线程里（本项目固定为 {@code agent-model-stream-*} 虚拟线程）。于是：
  * <pre>
  *   ✗ ThreadLocal 里读不到上下文 → 工具审计的 conversationId 记成 0、turnId 记成 null
@@ -225,7 +224,7 @@ class AgentTurnContextTest {
                 .as("每一个终态事件都必须在枚举里真实存在")
                 .containsAll(terminal);
 
-        // HUMAN_REQUIRED 目前**不会由后端产生**（需要人工确认的两阶段写操作尚未实现）。
+        // HUMAN_REQUIRED 目前不会由后端产生（需要人工确认的两阶段写操作尚未实现）。
         // 这里显式记录这一点，避免读者看到枚举里有它就以为功能已经存在 ——
         // 仓库的独立审计把相关项列为"部分实现"，本教程照实标注。
         assertThat(all)

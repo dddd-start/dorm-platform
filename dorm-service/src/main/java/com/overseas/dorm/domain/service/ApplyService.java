@@ -51,7 +51,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 入住申请服务 —— 业务核心。
+ * 入住申请服务，业务核心。
  *
  * <p>这个类集中体现了本系统对「数据一致性」的取舍：
  * <ul>
@@ -86,8 +86,7 @@ public class ApplyService {
     /**
      * 自身代理（ObjectProvider 惰性解析，避免与自身形成构造期循环）。
      *
-     * <p>用途只有一个：{@link #create} 需要在**真正的新事务**里重试 ——
-     * Spring 的事务是代理实现的，类内部自调用会让 {@code @Transactional} 失效
+     * <p>用途只有一个：{@link #create} 需要在真正的新事务里重试，* Spring 的事务是代理实现的，类内部自调用会让 {@code @Transactional} 失效
      * （本项目在 {@code KnowledgeBaseLoader}、{@code ConversationService} 上都踩过）。
      */
     private final org.springframework.beans.factory.ObjectProvider<ApplyService> selfProvider;
@@ -112,7 +111,7 @@ public class ApplyService {
      * </pre>
      */
     public ApplyVO create(ApplyCreateRequest request, ApplySource source) {
-        // 【M8 修复（做到 20/20）】并发同一幂等键时，**换一个新事务重试**，而不是在
+        // 【M8 修复（做到 20/20）】并发同一幂等键时，换一个新事务重试，而不是在
         // 已经"中毒"的旧事务里回查。
         //
         // 旧事务为什么不行：MySQL 默认 REPEATABLE-READ，一致性读沿用事务开始时的快照；
@@ -121,7 +120,7 @@ public class ApplyService {
         // 但剩下 9 个仍然会走到 detail() —— 那一步又在本事务里读，仍然看不见胜者，
         // 只能退化成「提交冲突，请重试」（诚实，但不是幂等重放语义）。
         //
-        // 为什么重试一定能看到胜者：InnoDB 的重复键插入**会阻塞到胜者提交/回滚**，
+        // 为什么重试一定能看到胜者：InnoDB 的重复键插入会阻塞到胜者提交/回滚，
         // 所以拿到 DuplicateKeyException 时胜者必然已经提交；此时开一个新事务，
         // 新快照必然包含它，第 3 步幂等检查就会命中并返回完整 detail。
         // 这也是"整段放进新事务 + 重试"而不是"局部回查"的原因（交接文档里的结论）。
@@ -228,7 +227,7 @@ public class ApplyService {
         apply.setIdempotencyKey(request.idempotencyKey() == null || request.idempotencyKey().isBlank()
                 ? null : request.idempotencyKey());
 
-        // 唯一索引冲突（幂等键或单号撞车）：**不在这里回查**，直接抛给外层
+        // 唯一索引冲突（幂等键或单号撞车）：不在这里回查，直接抛给外层
         // create() 换一个新事务重试（原因见 create() 的注释）。
         applyMapper.insert(apply);
 
@@ -657,7 +656,7 @@ public class ApplyService {
      * 定时失效扫描：审批通过但超期未入住的申请自动失效并释放床位。
      *
      * <p>为什么要定时任务而不是"查询时过滤"：如果不主动释放，
-     * 床位会被永久占住 —— 员工没来住，房间也订不了，这是资源上的实际损失。
+     * 床位会被永久占住，员工没来住，房间也订不了，这是资源上的实际损失。
      */
     @Scheduled(fixedDelayString = "${dorm.apply.expire-scan-ms:300000}")
     @Transactional
@@ -730,9 +729,9 @@ public class ApplyService {
      *
      * <p>数据权限的三条分支：
      * <ul>
-     *   <li>员工 —— 强制只查自己的（不允许通过传 employeeId 看别人）；</li>
-     *   <li>区域管理员 —— 只能查本区域；</li>
-     *   <li>总管理员 —— 全部，可按区域筛选。</li>
+     *   <li>员工，强制只查自己的（不允许通过传 employeeId 看别人）；</li>
+     *   <li>区域管理员，只能查本区域；</li>
+     *   <li>总管理员，全部，可按区域筛选。</li>
      * </ul>
      */
     public PageResult<ApplyVO> page(long current, long size, ApplyStatus status, Long regionId,

@@ -14,8 +14,8 @@ import java.util.List;
  *
  * <p>两条不变量由本接口配合唯一索引保证：
  * <ol>
- *   <li>{@code (conversation_id, seq_no)} 唯一 —— 会话内消息不乱序；</li>
- *   <li>{@code turn_id} 唯一 —— 同一轮重复提交只落一条助手消息（幂等）。</li>
+ *   <li>{@code (conversation_id, seq_no)} 唯一，会话内消息不乱序；</li>
+ *   <li>{@code turn_id} 唯一，同一轮重复提交只落一条助手消息（幂等）。</li>
  * </ol>
  * 归档相关方法按 LIMIT 分批搬迁，便于随时中断与重入。
  */
@@ -53,9 +53,9 @@ public interface AgentMessageMapper extends BaseMapper<AgentMessage> {
      * <p><b>为什么必须同时限定 user_id 与会话</b>：改造前这条 SQL 只有
      * {@code WHERE turn_id = ? AND role = 'ASSISTANT'}。turnId 由客户端提供，
      * 于是任意登录用户只要猜到/拿到别人的 turnId，就能通过"幂等重放"这条路径
-     * **读到别人的回答**（独立验证实测：攻击者用自己的会话 + 受害者的 turnId
+     * 读到别人的回答（独立验证实测：攻击者用自己的会话 + 受害者的 turnId
      * 调用 /api/agent/chat/stream，收到 replayed=true 与受害者正文 29 字）。
-     * 而其它三条访问路径（历史/回放/续传）都被正确拦截 —— 这是一条授权旁路。
+     * 而其它三条访问路径（历史/回放/续传）都被正确拦截，这是一条授权旁路。
      *
      * <p>现在同时限定会话归属：只有"本人在本会话里"的那一轮才允许重放。
      */
@@ -94,7 +94,7 @@ public interface AgentMessageMapper extends BaseMapper<AgentMessage> {
      * 冷热分离：把指定会话集合中 N 天前的消息搬进归档表。
      *
      * <p><b>为什么要限定会话状态</b>：如果按时间全局搬迁，活跃会话的历史会被搬走，
-     * 用户打开旧对话会看到"消息不见了"——这是比"表变大"严重得多的问题。
+     * 用户打开旧对话会看到"消息不见了"，这是比"表变大"严重得多的问题。
      * 因此归档只针对用户已主动归档（{@code ARCHIVED}）的会话：
      * 这些会话本来就不在活跃列表里，其历史只在审计时需要，放到归档表正合适。
      */

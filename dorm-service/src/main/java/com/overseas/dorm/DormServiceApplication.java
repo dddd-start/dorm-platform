@@ -16,8 +16,8 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
  *
  * <p>对外接口分两类：
  * <ul>
- *   <li>{@code /api/**} —— 给前端使用，JWT 鉴权；</li>
- *   <li>{@code /internal/**} —— 给 agent-service 使用，内部令牌 + 用户 JWT 双重校验。</li>
+ *   <li>{@code /api/**}，给前端使用，JWT 鉴权；</li>
+ *   <li>{@code /internal/**}，给 agent-service 使用，内部令牌 + 用户 JWT 双重校验。</li>
  * </ul>
  */
 @SpringBootApplication

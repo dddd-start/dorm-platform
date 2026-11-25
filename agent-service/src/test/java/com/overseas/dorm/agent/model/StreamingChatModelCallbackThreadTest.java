@@ -29,7 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@link VirtualThreadJdkHttpClient} 之后，token / 完成回调必须落在
  * 本项目自己的虚拟线程上，而不是 {@code ForkJoinPool.commonPool}。
  *
- * <p>这条测试是“换回默认 JdkHttpClient 就会红”的那种 —— 它不测业务，
+ * <p>这条测试是“换回默认 JdkHttpClient 就会红”的那种，它不测业务，
  * 只测“模型流到底跑在哪条线程上”这个容量属性。
  */
 class StreamingChatModelCallbackThreadTest {
