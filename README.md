@@ -98,7 +98,7 @@ git clone https://github.com/dddd-start/dorm-platform.git && cd dorm-platform
 bash scripts/env-install.sh      # 可选：无 Docker 时，把 MySQL/Redis/Maven 准备到项目 env/ 下
 bash scripts/env-start.sh        # 启动 MySQL(3307) / Redis(6380)，建库建账号（随机口令）
 bash scripts/build.sh            # 构建两个 jar + UI 静态产物
-bash scripts/demo.sh             # 一键：起服务 → 冒烟 → 打印演示账号与 5 分钟路线
+bash scripts/demo.sh             # 起服务 → 冒烟 → 打印演示账号与功能入口
 ```
 
 访问 <http://127.0.0.1:8080>，接口文档 <http://127.0.0.1:8081/swagger-ui.html>。
@@ -236,7 +236,7 @@ node scripts/ui-check.mjs    # Playwright 页面检查（需自行安装 playwri
 | 知识库装载 | 10 篇文档 / 110 个切片，区域文档解析出 `region_id` | `GET /api/agent/admin/knowledge` |
 
 > 说明：单测与 12 项冒烟进了 CI（零外部依赖，托管 runner 可直接跑）；
-> **27 项回归需要真实 MySQL/Redis，不在 CI 内**，靠本地 `scripts/regression.sh` 一键复跑。
+> 27 项回归需要真实 MySQL/Redis，不在 CI 内，通过本地 `scripts/regression.sh` 执行。
 
 CI（`.github/workflows/ci.yml`）：JDK 21 + Maven 缓存执行后端单测，Node 24 执行 `npm ci && npm run build`。
 工作流不需要 secrets，也不依赖外部服务，因为单测本身不连接数据库与模型。
