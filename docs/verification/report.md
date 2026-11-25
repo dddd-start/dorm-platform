@@ -1,6 +1,6 @@
 # 验收报告（dorm-platform）
 
-> 生成时间 2026-11-24 17:08 · 数据来源：`*/target/surefire-reports/TEST-*.xml`（Maven Surefire 原始输出）
+> 生成时间 2026-11-25 17:57 · 数据来源：`*/target/surefire-reports/TEST-*.xml`（Maven Surefire 原始输出）
 
 > 本文件由 `bash scripts/make-verification.sh` 生成，重跑即可复现同一组数字。
 
@@ -21,25 +21,25 @@
 
 | 模块 | 测试类 | 用例数 | 耗时 |
 |---|---|---|---|
-| agent-service | 14 | 91 | 5.00s |
-| dorm-contract | 4 | 47 | 0.57s |
-| **合计** | **18** | **138** | **5.58s** |
+| agent-service | 14 | 91 | 5.09s |
+| dorm-contract | 4 | 47 | 0.58s |
+| **合计** | **18** | **138** | **5.67s** |
 
 ## 三、逐类明细
 
 | 模块 | 测试类 | 用例 | 耗时 | 失败 |
 |---|---|---|---|---|
 | agent-service | `AgentTurnContextTest` | 9 | 0.03s | 0 |
-| agent-service | `AgentTurnServiceAdmissionTest` | 1 | 3.04s | 0 |
+| agent-service | `AgentTurnServiceAdmissionTest` | 1 | 3.01s | 0 |
 | agent-service | `ContentGuardrailTest` | 9 | 0.02s | 0 |
-| agent-service | `DormChatMemoryStoreTest` | 1 | 0.09s | 0 |
+| agent-service | `DormChatMemoryStoreTest` | 1 | 0.10s | 0 |
 | agent-service | `GuardedToolProviderCancelTest` | 2 | 0.01s | 0 |
-| agent-service | `GuardedToolProviderPolicyTest` | 9 | 0.12s | 0 |
-| agent-service | `KnowledgeChunkingInvariantTest` | 6 | 0.14s | 0 |
+| agent-service | `GuardedToolProviderPolicyTest` | 9 | 0.14s | 0 |
+| agent-service | `KnowledgeChunkingInvariantTest` | 6 | 0.15s | 0 |
 | agent-service | `MarkdownChunkerTest` | 6 | 0.04s | 0 |
 | agent-service | `PromptInjectionDetectorTest` | 23 | 0.15s | 0 |
 | agent-service | `SseChannelContractTest` | 10 | 0.04s | 0 |
-| agent-service | `StreamingChatModelCallbackThreadTest` | 1 | 1.25s | 0 |
+| agent-service | `StreamingChatModelCallbackThreadTest` | 1 | 1.32s | 0 |
 | agent-service | `ToolCatalogTest` | 5 | 0.02s | 0 |
 | agent-service | `VectorCodecTest` | 7 | 0.04s | 0 |
 | agent-service | `VirtualThreadJdkHttpClientTest` | 2 | 0.03s | 0 |
