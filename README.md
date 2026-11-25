@@ -18,7 +18,7 @@
 
 ---
 
-## 一、先看效果
+## 一、界面截图与录屏
 
 | 管理端统计看板 | AI 助手（流式回答 + 引用 + 工具卡片） |
 |---|---|
@@ -30,32 +30,32 @@
 
 > 更多截图与说明见 [`docs/screenshots/manifest.md`](docs/screenshots/manifest.md)。
 
-### 两段动图（均为本机实跑录制，非剪辑）
+### 演示录屏
 
-| 动图 | 内容 | 说明 |
-|---|---|---|
-| [`docs/media/agent-stream.gif`](docs/media/agent-stream.gif) | AI 助手回答「上海员工去新加坡出差，怎么申请宿舍？」的完整流式过程 | **工具调用可见**（`searchPolicies` / `listRegions` 带真实入参与返回）、RAG 已启用、回答带制度条款溯源、逐字生成而非一次性返回 |
-| [`docs/media/demo-walkthrough.gif`](docs/media/demo-walkthrough.gif) | 登录 → 统计看板 → 房源查询 → 审批页 → AI 助手 | 三服务联调、区域数据权限、状态机 UI 全链路可用 |
+| 文件 | 内容 |
+|---|---|
+| [`agent-stream.gif`](docs/media/agent-stream.gif) | AI 助手回答「上海员工去新加坡出差，怎么申请宿舍」的流式过程：思考过程、`searchPolicies` / `listRegions` 工具调用与返回、带制度条款的回答 |
+| [`demo-walkthrough.gif`](docs/media/demo-walkthrough.gif) | 登录 → 统计看板 → 房源查询 → 审批页 → AI 助手 |
 
-> 录制方式：Playwright 驱动真实浏览器跑在本机三服务上，逐帧截图后用 Pillow 合成 GIF。
-> 复现命令与实测数据见 [`docs/verification/report.md`](docs/verification/report.md)（138 单测 / 12 冒烟 / 27 回归）；
-> 三服务启动步骤见上面「快速开始」。
+> 由 Playwright 驱动本机三服务逐帧截图、Pillow 合成；测试数据见 [`docs/verification/report.md`](docs/verification/report.md)。
 
 ---
 
-## 二、这个项目解决了什么问题
+## 二、功能与业务场景
 
-| 问题 | 做法 | 结果 |
-|---|---|---|
-| 海外多地宿舍资源分散，区域管理员只能看本区数据 | 数据权限下沉到业务服务的 Mapper 层（区域 → 公寓 → 房间 → 床位）；用户与审计同样走 `DataScope` | 越权请求在 SQL 层或 Service 层被过滤，不依赖前端隐藏菜单 |
-| 申请、审批、分床、入住、退房是一条状态机，人工改库容易错 | 状态机集中一处 + 幂等键 + 审计 | 27 项全流程回归 27/27 通过 |
-| 多人同时抢同一张床位 | 条件更新（`where status='IDLE'`）而不是先查后改 | 抢床冲突返回业务错误，不产生双人入住 |
-| 员工问「去新加坡出差怎么申请宿舍」要翻多份制度 | 知识库 RAG + 工具查实时房态 + 流式回答带引用 | 回答可溯源到具体制度，工具调用可见 |
-| AI 写操作（提交申请 / 退房）风险高 | 工具目录区分读写 + 护栏 + 限流 + 审计 | 每次工具调用入库，可按轮次回放 |
+业务覆盖「出差申请 → 宿舍预订 → 审批分床 → 入住 / 退房 → 统计与审计」全流程，按区域（SEA / EU / ME / NEA）隔离数据。
+
+| 模块 | 实现要点 |
+|---|---|
+| 数据权限 | 下沉到 Mapper 层（区域 → 公寓 → 房间 → 床位），用户与审计同样走 `DataScope`；越权在 SQL 或 Service 层被过滤 |
+| 状态机 | 申请 / 订单状态集中一处，配幂等键与审计；27 项全流程回归覆盖状态迁移 |
+| 床位并发 | 条件更新（`where status='IDLE'`）而非先查后改，冲突返回业务错误 |
+| AI 助手 | 知识库 RAG + 工具查实时房态 + 流式回答带引用；回答可溯源到制度条款 |
+| 写操作防护 | 工具目录区分读写，配合护栏、限流与审计；每次工具调用入库，可按轮次回放 |
 
 ---
 
-## 三、架构：三个服务，三条数据边界
+## 三、服务划分与数据边界
 
 ```
                          ┌────────────────────────────────────┐
@@ -127,18 +127,18 @@ docker compose -f deploy/docker-compose.yml up --build
 | `sea.admin` / `eu.admin` / `me.admin` / `nea.admin` | `Dorm@123456` | 区域管理员（只看到本区数据） |
 | `zhangwei` / `liuyang` / `chenjing` … | `Dorm@123456` | 员工 |
 
-### 5 分钟演示路线
+### 主要功能入口
 
-`bash scripts/demo.sh` 会把这条路线打印出来：
+`bash scripts/demo.sh` 启动后会打印以下路径：
 
-1. **房源查询** → 选区域、看房态与床位（数据权限按区域收口）
-2. **提交入住申请** → 填日期提交（状态机 + 幂等键，重复提交不产生脏申请）
-3. **管理员审批** → 分配床位（并发抢床走条件更新，不会双人入住）
-4. **入住 / 退房** → 订单详情（订单、房态、账单联动）
-5. **统计看板** → 入住率 / 区域分布（聚合统计与缓存）
-6. **AI 助手** → 问「上海员工去新加坡出差，怎么申请宿舍？」（RAG 引用 + 工具调业务 HTTP + SSE 流式）
-7. **Agent 运营看板** → 模型健康 / token 用量 / 知识库 / 工具审计（可观测性）
-8. **审计日志** → 最近操作（可回溯）
+1. **房源查询**：按区域筛选、查看房态与床位
+2. **提交入住申请**：填日期提交，幂等键防重复建单
+3. **管理员审批**：分配床位，并发抢床走条件更新
+4. **入住 / 退房**：订单详情含房态与账单
+5. **统计看板**：入住率与区域分布
+6. **AI 助手**：提问「上海员工去新加坡出差，怎么申请宿舍」，走 RAG 引用 + 工具调业务 HTTP + SSE 流式
+7. **Agent 运营看板**：模型健康、token 用量、知识库、工具审计
+8. **审计日志**：操作记录
 
 ---
 
@@ -155,7 +155,7 @@ docker compose -f deploy/docker-compose.yml up --build
 
 ---
 
-## 六、关键设计
+## 六、关键实现
 
 ### 6.1 SSE 流式协议：事件可续传、跨实例
 
@@ -218,7 +218,7 @@ dorm_db                             agent_db
 
 ---
 
-## 八、测试与验收（数字都能复跑）
+## 八、测试与验收
 
 ```bash
 mvn test                     # 138 个单测：contract 47 + agent 91，失败 0；不需要 DB / 模型 / Key
@@ -265,24 +265,24 @@ dorm-platform/
 
 ## 十、文档索引
 
-| 想了解 | 看这个 |
+| 主题 | 文档 |
 |---|---|
-| 关键设计决策与 17 个真实踩坑 | [`docs/design-notes/`](docs/design-notes/README.md) |
+| 设计决策与 17 个踩坑记录 | [`docs/design-notes/`](docs/design-notes/README.md) |
 | 服务边界与模块设计 | [`docs/architecture.md`](docs/architecture.md) |
 | SSE 流式全链路（准入 → 生成 → 收口 → 续传 → 背压） | [`docs/agent-sse-design.md`](docs/agent-sse-design.md) |
-| 为什么这么拆、代码落在哪 | [`docs/migration.md`](docs/migration.md) |
+| 拆分过程与模块映射 | [`docs/migration.md`](docs/migration.md) |
 | 验收记录与实测数字 | [`docs/verification.md`](docs/verification.md) · [`docs/verification/report.md`](docs/verification/report.md)（[PDF](docs/verification/report.pdf)，由同一份 md 渲染）· [`docs/parity.md`](docs/parity.md) |
 | 7 张架构 / 时序图 | [`docs/diagrams/`](docs/diagrams) |
-| **LangChain4j 生产化笔记（10 章，外链）** | [dddd-start/langchain4j-in-action](https://github.com/dddd-start/langchain4j-in-action) |
+| LangChain4j 生产化笔记（10 章，外部仓库） | [dddd-start/langchain4j-in-action](https://github.com/dddd-start/langchain4j-in-action) |
 | 截图清单 | [`docs/screenshots/manifest.md`](docs/screenshots/manifest.md) |
 
 ---
 
 ## 十一、已知限制
 
-这个项目目前只在本机/内网运行，没有线上流量。下面这些点确实没做到，一并列出：
+本项目仅在本机/内网运行，未部署到线上。以下限制尚未解决：
 
-| # | 限制 | 现状 | 如果上线会怎么改 |
+| # | 限制 | 现状 | 改进方向 |
 |---|---|---|---|
 | 1 | **27 项回归不进 CI** | 需要真实 MySQL/Redis，`scripts/regression.sh` 本地一键复跑；CI 只跑零依赖的 138 单测 | 用 Testcontainers 起 MySQL/Redis，或给 runner 加 compose 服务 |
 | 2 | **公寓联系人电话是明文** | 只有员工手机号走了 AES-256-GCM；`building.contact_phone` 未加密 | 同一套 `PhoneCipher` 复用过去，或改成只存分机 |
@@ -295,5 +295,4 @@ dorm-platform/
 | 9 | **长期记忆是模型自由文本** | 原样拼进 system prompt，未做不可信内容包裹 | 结构化字段 + 白名单 + 注入检测后再回灌 |
 | 10 | **CORS 放得较宽** | 允许 `192.168.*` / `10.*` 任意来源且 `allowCredentials=true`（为了内网多机调试） | 收敛成配置白名单 |
 
-安全相关的三条（token 吊销、跨区越权、写路径 SQL 注入）在 2026-11 这轮里**已经修掉**，
-对应改动见 `git log` 与 `docs/design-notes/`。
+token 吊销、跨区越权、写路径 SQL 注入三项已于 2026-11 修复，改动见 `git log` 与 [`docs/design-notes/`](docs/design-notes/README.md)。

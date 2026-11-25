@@ -1,7 +1,7 @@
 # 真实踩过的坑（17 个）
 
 > 来源：`docs/agent-sse-design.md`、`docs/parity.md`、`docs/verification.md`、git log，以及源码注释里带编号的缺陷记录（H*/M*/P*）。
-> 每条四段：现象 → 定位 → 修复 → 结论。重点在后两段：定位方法与可复用结论比"修了个 bug"更有价值。
+> 每条四段：现象 → 定位 → 修复 → 结论。
 
 ---
 
