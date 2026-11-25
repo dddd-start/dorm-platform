@@ -10,9 +10,8 @@
 [![Vue 3](https://img.shields.io/badge/Vue-3.5-4FC08D?logo=vuedotjs&logoColor=white)](https://vuejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green)](./LICENSE)
 
-把「宿舍查询 → 入住申请 → 审批分床 → 入住 / 退房 → 统计审计」这条行政业务链路做成三个可独立构建、
-独立部署、独立扩缩的服务；并在业务边界之上加了一个**能真正调用业务接口**的流式 AI 助手：
-流式输出可断线续传、回答带知识库引用、写操作受工具权限与护栏约束。
+把「宿舍查询 → 入住申请 → 审批分床 → 入住 / 退房 → 统计审计」拆为三个可独立构建与部署的服务，
+并在业务边界之上提供流式 AI 助手：输出支持断线续传，回答带知识库引用，写操作受工具权限与护栏约束。
 
 </div>
 
