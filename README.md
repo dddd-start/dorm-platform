@@ -229,7 +229,7 @@ node scripts/ui-check.mjs    # Playwright 页面检查（需自行安装 playwri
 
 | 项目 | 结果 | 怎么复跑 |
 |---|---|---|
-| 单元测试 | **138 / 138 通过**（契约层 47 + Agent 91，覆盖状态机、跨线程上下文、SSE 通道契约、工具权限、护栏） | `mvn test`（零外部依赖，CI 里同样跑） |
+| 单元测试 | 138 / 138 通过（契约层 47 + Agent 91，覆盖状态机、跨线程上下文、SSE 通道契约、工具权限、护栏） | `mvn test`（零外部依赖，CI 里同样执行） |
 | 冒烟（三服务 + SSE） | **12 / 12 通过** | `bash scripts/smoke.sh` |
 | 业务全流程回归 | **27 / 27 通过**（服务就绪 → 认证与权限 → 查房 → 申请与幂等 → 审批分床 → 入住/退房与审计） | `bash scripts/regression.sh`（需先 `env-start.sh && build.sh && start.sh`） |
 | 浏览器页面检查 | 登录跳转、`/rooms`、`/admin/dashboard`、`/agent`、`/admin/agent-ops` 渲染正常、控制台无 error | `node scripts/ui-check.mjs`（需自行 `npm i playwright`） |
@@ -238,8 +238,8 @@ node scripts/ui-check.mjs    # Playwright 页面检查（需自行安装 playwri
 > 说明：单测与 12 项冒烟进了 CI（零外部依赖，托管 runner 可直接跑）；
 > **27 项回归需要真实 MySQL/Redis，不在 CI 内**，靠本地 `scripts/regression.sh` 一键复跑。
 
-CI（`.github/workflows/ci.yml`）：JDK 21 + Maven 缓存跑后端单测，Node 24 跑 `npm ci && npm run build`；
-**工作流内零 secrets、零外部服务**，因为单测刻意设计成零外部依赖。
+CI（`.github/workflows/ci.yml`）：JDK 21 + Maven 缓存执行后端单测，Node 24 执行 `npm ci && npm run build`。
+工作流不需要 secrets，也不依赖外部服务，因为单测本身不连接数据库与模型。
 
 ---
 
@@ -283,7 +283,7 @@ dorm-platform/
 
 | # | 限制 | 现状 | 改进方向 |
 |---|---|---|---|
-| 1 | **27 项回归不进 CI** | 需要真实 MySQL/Redis，`scripts/regression.sh` 本地一键复跑；CI 只跑零依赖的 138 单测 | 用 Testcontainers 起 MySQL/Redis，或给 runner 加 compose 服务 |
+| 1 | 27 项回归不进 CI | 需要真实 MySQL/Redis，`scripts/regression.sh` 本地复跑；CI 只跑零依赖的 138 单测 | 用 Testcontainers 起 MySQL/Redis，或给 runner 加 compose 服务 |
 | 2 | **公寓联系人电话是明文** | 只有员工手机号走了 AES-256-GCM；`building.contact_phone` 未加密 | 同一套 `PhoneCipher` 复用过去，或改成只存分机 |
 | 3 | **`/actuator/prometheus` 不存在** | `application.yml` 里写了 exposure 但 pom 没加 `micrometer-registry-prometheus`，实际 404；只有 `/actuator/health`、`/metrics` 可用 | 加一个依赖即可，或把配置项删掉避免误导 |
 | 4 | **提前预订语义有限** | `availableBeds` 是"此刻可分配的床位数"，不校验未来日期区间冲突（提前 6 个月可提交申请，但床位是快照模型） | 上 `bed_occupancy(bed_id, date_from, date_to)` 区间表 + 唯一约束 |

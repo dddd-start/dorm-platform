@@ -75,7 +75,7 @@ public class AgentStreamBuffer {
     /**
      * 并发计数键的存活时间。
      *
-     * <p>这里刻意做成"比单轮最长耗时略长"而不是拍一个 10 分钟：
+     * <p>这里有意做成"比单轮最长耗时略长"而不是拍一个 10 分钟：
      * 如果进程在生成中途被强杀（发布、扩缩容、OOM），计数就来不及递减；
      * TTL 太长会让这些用户在一段时间内持续被自己的"幽灵并发"挡住
      * （表现为"过一会儿就再也问不了助手"）。TTL 取
@@ -232,7 +232,7 @@ public class AgentStreamBuffer {
     /**
      * 某个 SSE 事件名是否代表"这一轮结束了"。
      *
-     * <p>刻意与 {@link #isTerminal(StreamState)} 分开而不是重载同名方法：
+     * <p>有意与 {@link #isTerminal(StreamState)} 分开而不是重载同名方法：
      * 两者判断的是不同的东西，一个是<b>事件</b>（DONE/ERROR/BLOCKED/INTERRUPTED），
      * 一个是<b>流状态</b>（含 GENERATING）。同名重载会让调用方很容易传错参数，
      * 而这两者传错的后果（重连时提前关闭连接）非常隐蔽。

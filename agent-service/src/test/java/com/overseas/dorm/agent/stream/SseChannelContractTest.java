@@ -113,7 +113,7 @@ class SseChannelContractTest {
 
             await(() -> channel.writtenFrames() == 1, "第一帧写出");
             assertThat(channel.suppressedDuplicates())
-                    .as("这是刻意保留的快速路径：如果旧序号到达时 nextSeq 已经推进，"
+                    .as("这是有意保留的快速路径：如果旧序号到达时 nextSeq 已经推进，"
                             + "说明它要么已经写过、要么已经由 close 强制刷出。真正处理"
                             + "乱序的是 pendingBySeq；这条断言守住'不补写旧序号'的语义")
                     .isEqualTo(1);

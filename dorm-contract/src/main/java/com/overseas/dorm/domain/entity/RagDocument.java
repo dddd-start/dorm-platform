@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 /**
  * RAG 知识文档。
  *
- * <p>{@code version} 与 {@code indexedVersion} 的分离是刻意设计：
+ * <p>{@code version} 与 {@code indexedVersion} 的分离是有意设计：
  * 文档内容更新后，重建索引是有成本的（要重新切分 + 重新向量化）。
  * 两者不一致就说明「该文档已更新但索引还是旧的」，
  * 启动时与后台任务据此决定要不要重建，也用于让检索缓存失效。

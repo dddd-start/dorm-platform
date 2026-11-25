@@ -63,7 +63,7 @@ public class PromptInjectionDetector {
      * 而"索取凭据"在正常业务里没有任何正当场景，员工问制度、查房源、办入住
      * 都不需要向助手索要口令。因此这里可以做成"命中即拦截"。
      *
-     * <p>刻意避开误伤：正常用户会说「我忘记密码了怎么办」「怎么修改登录密码」，
+     * <p>有意避开误伤：正常用户会说「我忘记密码了怎么办」「怎么修改登录密码」，
      * 这类句式没有"把…告诉/发给我"或"告诉我…密码"的索取方向，不会命中。
      */
     private static final List<Pattern> CREDENTIAL_REQUEST = List.of(

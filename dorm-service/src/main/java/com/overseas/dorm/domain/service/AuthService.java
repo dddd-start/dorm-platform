@@ -249,7 +249,7 @@ public class AuthService {
             // ③ Redis 不可用时必须拒绝，不能"读不到就放行" ——
             //    否则这里就成了一个新的 fail-open（拿不到版本号恰恰是最需要保守的时刻：
             //    Redis 挂了就无法判断该令牌是否已被吊销）。
-            //    这里刻意只记 ERROR 不抛出：抛出去会被全局异常处理变成 500，
+            //    这里有意只记 ERROR 不抛出：抛出去会被全局异常处理变成 500，
             //    而"认证信息暂时无法校验"对客户端应当是 401 而不是"服务器炸了"。
             log.error("会话校验失败（Redis 异常），按已失效处理 userId={} sid={}", userId, sessionId, e);
             return false;

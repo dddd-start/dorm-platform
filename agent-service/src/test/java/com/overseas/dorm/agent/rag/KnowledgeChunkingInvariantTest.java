@@ -82,7 +82,7 @@ class KnowledgeChunkingInvariantTest {
         assertThat(max)
                 .as("切片长度必须受控：工具结果全部进模型上下文并计费，"
                         + "而且超长切片会把真正相关的段落稀释掉。"
-                        + "允许超出 overlap 的量，因为重叠是刻意保留的尾部")
+                        + "允许超出 overlap 的量，因为重叠是有意保留的尾部")
                 .isLessThanOrEqualTo(CHUNK_SIZE + OVERLAP);
     }
 
@@ -227,7 +227,7 @@ class KnowledgeChunkingInvariantTest {
         // 但它是真的，所以这里断言"绝大多数"而不是"全部"，并把例外写在测试里。
         int percent = sameTitlePairs == 0 ? 100 : overlappingPairs * 100 / sameTitlePairs;
         assertThat(percent)
-                .as("重叠是刻意的设计：跨段落的关键句至少要在某一个切片里是完整的。"
+                .as("重叠是有意的设计：跨段落的关键句至少要在某一个切片里是完整的。"
                         + "比例过低说明重叠逻辑在真实文档上没生效")
                 .isGreaterThanOrEqualTo(90);
     }

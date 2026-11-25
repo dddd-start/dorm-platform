@@ -214,7 +214,7 @@ public final class SseChannel implements AutoCloseable {
     /**
      * 必须在 {@link #offerLock} 内调用。
      *
-     * <p>日志刻意放在锁外（{@link #logOverflow()}）：logback 的 appender 可能是
+     * <p>日志放在锁外（{@link #logOverflow()}）：logback 的 appender 可能是
      * 同步写文件/网络，放在锁内会让所有生产者一起等 I/O。
      */
     private boolean enqueueLocked(Frame frame) {
@@ -307,7 +307,7 @@ public final class SseChannel implements AutoCloseable {
     /**
      * 本轮正常结束：请求优雅收尾。
      *
-     * <p>刻意不在这里排空队列，队列的消费者只能是写入器线程。
+     * <p>不在这里排空队列，队列的消费者只能是写入器线程。
      * 之前这个方法在调用方（生成）线程上轮询同一个队列，与写入器形成两个消费者，
      * 是"末帧丢失"竞态的另一半原因。
      */

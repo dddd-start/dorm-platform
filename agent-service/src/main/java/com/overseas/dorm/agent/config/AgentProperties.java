@@ -76,7 +76,7 @@ public class AgentProperties {
         /**
          * 上游模型的最大并发调用数（保护模型服务商）。
          *
-         * <p>与 {@code dorm.agent.stream.max-streams-global} 刻意解耦：
+         * <p>与 {@code dorm.agent.stream.max-streams-global} 独立配置：
          * 前者是"容器能容纳多少条并发流"，后者是"我们向上游同时发多少请求"。
          * 第三方模型按账号限流，把自己的容量当成上游的容量会导致
          * 429 → 熔断 → 降级链切换 → 调用量进一步放大的正反馈，
@@ -157,7 +157,7 @@ public class AgentProperties {
          *
          * <p>容量按"最坏内存"反推：容量 × 单帧大小 × 连接数。
          * 单帧约 200~500 字节（含 JSON 包装），512 帧 ≈ 100~250KB/连接；
-         * 1000 连接最坏约 100~250MB。这是刻意选择的边界：
+         * 1000 连接最坏约 100~250MB。这是有意选定的边界：
          * 如果设成无限大，慢客户端会直接把堆吃光（那才是真正的"容器被打挂"）。
          */
         private int channelQueueCapacity = 512;
@@ -230,7 +230,7 @@ public class AgentProperties {
          * 超时从未触发；而真实 provider 是异步的（历史上超时触发过 9 次）。
          * 要验证超时/中断这类与生成并发的逻辑，必须让 mock 也异步。
          *
-         * <p>刻意不改默认值：改成异步会改变 1000 并发压测的测量条件，
+         * <p>保持默认值不变：改成异步会改变 1000 并发压测的测量条件，
          * 此前记录的压测数字将不再可比。需要时用
          * {@code --dorm.agent.mock.async-streaming=true} 显式开启。
          */

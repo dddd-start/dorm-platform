@@ -24,7 +24,7 @@ import java.util.Map;
  *
  * <p>所以这里把记忆做成<b>显式工具</b>：模型只有在"用户明确表达了
  * 稳定偏好"时才调用它，而且用户可以在界面上查看和清除自己的记忆
- * （见 {@code /api/agent/memories}）。这是一种刻意的克制。
+ * （见 {@code /api/agent/memories}）。这是一种有意的克制。
  */
 @Slf4j
 @Component

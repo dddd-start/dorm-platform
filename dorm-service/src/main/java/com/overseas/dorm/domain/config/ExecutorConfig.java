@@ -10,7 +10,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 /**
  * 线程池配置。
  *
- * <p>每个池的拒绝策略都是刻意选的，不是默认值：
+ * <p>每个池的拒绝策略都按用途选定，未使用默认值：
  * <ul>
  *   <li><b>auditExecutor</b>：队列满时 CallerRuns，审计宁可拖慢调用方也不能丢；</li>
  *   <li><b>outboxExecutor</b>：CallerRuns，事件投递不允许丢。</li>

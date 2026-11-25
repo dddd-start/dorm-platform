@@ -495,7 +495,7 @@ AiServices.builder(DormAgent.class)
 | 本轮 | 内存覆盖层（`activeTurnMessages`） | 工具循环要看到上一轮的 `assistant(tool_calls)` 与 `TOOL` 结果 |
 | 长期 | 会话摘要（12 轮后异步生成）+ 用户偏好 | 已经滑出窗口的关键信息 |
 
-两个刻意的取舍：
+两个有意的取舍：
 
 - `updateMessages` 不写库（只更新本轮内存视图）。落库统一由 `AgentTurnService` 负责，
   否则会出现"两份真相"：一份有 seq/turnId，一份没有；
@@ -527,7 +527,7 @@ AiServices.builder(DormAgent.class)
 | `dorm:stream:global` | String | 180 s | 起流 / 收尾 | 全局并发流 |
 | `dorm:ratelimit:agent:turn:{uid}` | Hash | 1 h | 每次提问 | 令牌桶 |
 
-并发计数键的 TTL = 生成超时 + 60 秒，是刻意的：进程被强杀时来不及 `DECR`，
+并发计数键的 TTL = 生成超时 + 60 秒，是有意为之：进程被强杀时来不及 `DECR`，
 键会自己过期，用户不会因为"幽灵并发"过一会儿就再也问不了助手。
 
 ### 9.3 失败与终态矩阵

@@ -136,7 +136,7 @@ public final class KnowledgeTestCorpus {
     /**
      * 解析 YAML front-matter（只支持本仓库用到的 {@code key: value} 单行形式）。
      *
-     * <p>刻意不引入 YAML 库：这里只需要读几个标量字段，
+     * <p>有意不引入 YAML 库：这里只需要读几个标量字段，
      * 而多一个解析依赖就多一份"它和生产的解析器行为不一致"的风险。
      */
     public static Map<String, String> frontMatter(String markdown) {

@@ -21,7 +21,7 @@ import java.util.UUID;
 /**
  * JWT 令牌签发与校验。
  *
- * <p>几个刻意的设计选择：
+ * <p>几个有意的设计选择：
  * <ol>
  *   <li><b>不存服务端会话</b>，但保留 jti（sessionId）写入 Redis 白名单，*       纯无状态 JWT 无法「强制下线」，而管理员禁用某人账号后，
  *       他的 token 还能用到过期，这在安全上是不可接受的；</li>
@@ -101,7 +101,7 @@ public class JwtTokenProvider {
                     // 旧版本（本次上线前）签发的令牌没有 epoch 声明 → 保持 null，
                     // 由 AuthService.verifySession 判为失效（不拆箱，因此不会 NPE）。
                     //
-                    // 这是刻意选择的 fail-closed：代价是"上线后所有已登录用户需要重新登录一次"，
+                    // 这是有意选择的 fail-closed：代价是"上线后所有已登录用户需要重新登录一次"，
                     // 收益是"上线前被禁用的账号、其旧令牌不可能因为缺少版本而被放行"。
                     // 该影响已写入 docs/defects-round35.md，避免被当成故障排查。
                     .authEpoch(claims.get(CLAIM_AUTH_EPOCH) == null ? null

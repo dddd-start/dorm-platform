@@ -80,7 +80,7 @@ public class RagEvaluator {
 
         for (GoldenItem item : goldenSet) {
             long start = System.currentTimeMillis();
-            // 评测刻意不设 minScore：要测的是"能不能排进前 k"，
+            // 评测不设 minScore：要测的是"能不能排进前 k"，
             // 而不是"阈值卡不卡得住"。阈值的影响单独用 No-Hit 率来观察。
             List<RagService.Hit> hits = ragService.retrieveForEvaluation(item.question(), null, k);
             long latency = System.currentTimeMillis() - start;

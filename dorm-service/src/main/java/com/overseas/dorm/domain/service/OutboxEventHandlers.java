@@ -90,7 +90,7 @@ public class OutboxEventHandlers {
     /**
      * 生成一条"通知意图"记录。
      *
-     * <p>刻意不叫 {@code sendNotification}：它没有真的发出去。
+     * <p>有意不叫 {@code sendNotification}：它没有真的发出去。
      * 命名要如实反映行为，否则下一个维护者会以为通知已经送达用户。
      *
      * <p>这里写审计是安全的：投递器运行在定时线程上，没有登录上下文，

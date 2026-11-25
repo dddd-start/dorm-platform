@@ -14,7 +14,7 @@
 | 全流程回归 | **27 / 27 通过** | `bash scripts/regression.sh` |
 | GitHub Actions | 最近一次 CI **success** | 见 Repo 的 Actions 标签 |
 
-> 单测刻意设计成**零外部依赖**（不需要 MySQL / Redis / 模型 Key），所以在任何机器上 `mvn test` 都能跑出同一结果。
+> 单测不依赖 MySQL / Redis / 模型 Key，`mvn test` 在任意机器上结果一致。
 
 
 ## 二、单元测试分布

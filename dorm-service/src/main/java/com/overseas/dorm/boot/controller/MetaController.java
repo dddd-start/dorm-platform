@@ -38,7 +38,7 @@ public class MetaController {
     /**
      * 全部枚举字典。
      *
-     * <p><b>这里刻意保留 {@code Map<String, Object>}</b>：它是字典聚合接口，
+     * <p><b>这里有意保留 {@code Map<String, Object>}</b>：它是字典聚合接口，
      * 17 个键各自对应一份不同的字典列表，键集合由"有哪些枚举"动态决定。
      * 为它硬造一个 17 字段的 record 并不会更安全（新增枚举时照样要改），
      * 反而会让"加一个枚举"变成两处改动。
