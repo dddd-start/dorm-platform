@@ -5,7 +5,7 @@
 
 | 文件 | 内容 | 适合回答 |
 |---|---|---|
-| [architecture-decisions.md](architecture-decisions.md) | 11 条关键决策：背景 → 备选方案 → 选择理由 → 代价/风险 → 被追问时怎么答 | 「为什么拆三个服务」「为什么 Agent 不直连业务库」「SSE 续传为什么放 Redis」 |
+| [architecture-decisions.md](architecture-decisions.md) | 11 条关键决策：背景 → 备选方案 → 选择理由 → 代价/风险 → 其它方案的排除理由 | 「为什么拆三个服务」「为什么 Agent 不直连业务库」「SSE 续传为什么放 Redis」 |
 | [pitfalls.md](pitfalls.md) | 17 个真实踩坑：现象 → 定位 → 修复 → 可复用排查法 | 「你遇到过什么难题」「怎么定位的」 |
 
 ## 最值得先看的 5 条
