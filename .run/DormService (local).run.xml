@@ -1,0 +1,14 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="DormService (local)" type="Application" factoryName="Application">
+    <option name="MAIN_CLASS_NAME" value="com.overseas.dorm.DormServiceApplication" />
+    <module name="dorm-service" />
+    <option name="VM_PARAMETERS" value="-Dfile.encoding=UTF-8 -Duser.timezone=Asia/Shanghai" />
+    <envs>
+      <env name="SPRING_PROFILES_ACTIVE" value="local" />
+      <env name="DORM_PORT" value="8081" />
+    </envs>
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>
