@@ -1,0 +1,236 @@
+<div class="topbar">
+  <h1>线程时序图</h1>
+  <span class="sub">dorm-platform · 49 个接口，每一步标出由哪条线程执行</span>
+  <span class="spacer"></span>
+  <button class="themebtn" id="themeBtn" type="button">切换主题</button>
+</div>
+
+<div class="legend">
+  <span><i class="lg-vt"></i>虚拟线程</span>
+  <span><i class="lg-pt"></i>平台线程池</span>
+  <span><i class="lg-ext"></i>外部系统（阻塞 I/O）</span>
+  <span><i class="lg-caller"></i>调用方</span>
+</div>
+
+<div class="shell">
+  <nav class="index" aria-label="接口索引">
+    <input id="q" type="search" placeholder="搜索路径、方法名、线程…" autocomplete="off" aria-label="搜索接口">
+    <div id="navList"></div>
+    <p class="nores" id="noRes" hidden>没有匹配的接口</p>
+  </nav>
+  <main id="reader" aria-live="polite"></main>
+</div>
+
+<script>
+const ALL = [
+  ...(typeof ENTRIES   !== 'undefined' ? ENTRIES   : []),
+  ...(typeof ENTRIES_2 !== 'undefined' ? ENTRIES_2 : []),
+  ...(typeof ENTRIES_3 !== 'undefined' ? ENTRIES_3 : []),
+  ...(typeof ENTRIES_4 !== 'undefined' ? ENTRIES_4 : []),
+];
+
+function totalCount(){ return ALL.filter(e => e.group !== 'overview').length; }
+
+// ── 主题切换（三态：跟随系统 → 亮 → 暗 → 跟随系统） ──
+(function(){
+  const btn = document.getElementById('themeBtn');
+  const root = document.documentElement;
+  let mode = 'system';
+  try { mode = localStorage.getItem('td-theme') || 'system'; } catch(e){}
+  const apply = () => {
+    if (mode === 'system') root.removeAttribute('data-theme');
+    else root.setAttribute('data-theme', mode);
+    btn.textContent = mode === 'system' ? '主题：跟随系统'
+      : mode === 'light' ? '主题：浅色' : '主题：深色';
+  };
+  apply();
+  btn.addEventListener('click', () => {
+    mode = mode === 'system' ? 'light' : mode === 'light' ? 'dark' : 'system';
+    try { localStorage.setItem('td-theme', mode); } catch(e){}
+    apply();
+  });
+})();
+
+// 颜色在 CSS 变量里，SVG 用 var() 引用，主题切换自动生效，无需重绘
+
+// ── 渲染一张图 ──
+function renderEntry(ent) {
+  const head = ent.method
+    ? `<span class="method">${esc(ent.method)}</span>`
+    : '';
+  const crumb = ent.group === 'overview'
+    ? '全局线程模型'
+    : (ent.group === 'sse' || ent.group === 'conv' || ent.group === 'admin')
+      ? 'agent-service' : 'dorm-service · /internal';
+
+  let fig = '';
+  if (ent.kind === 'tree') {
+    fig = `<div class="tree">` + ent.tree.map(n => `
+      <div class="tnode">
+        <div class="head">
+          <span class="who">${esc(n.who)}</span>
+          <span class="kind ${n.kind}">${n.kind === 'vt' ? '虚拟线程' : n.kind === 'pt' ? '平台线程池' : '外部系统'}</span>
+          <span class="made">${esc(n.made)}</span>
+        </div>
+        <p>${n.p}</p>
+      </div>`).join('') + `</div>`;
+  } else {
+    const svg = renderDiagram(ent);
+    const m = svg.match(/viewBox="0 0 (\d+) (\d+)"/);
+    const wide = m && +m[1] > 900;
+    fig = `<figure class="figure">
+      <div class="diagram-scroll${wide ? ' fit' : ''}">${svg}</div>
+      <div class="figtools">
+        <button type="button" class="fitbtn" aria-pressed="${wide ? 'true' : 'false'}">${
+          wide ? '适配宽度' : '原始大小'}</button>
+      </div>
+      <figcaption>${esc(ent.alt || '')}</figcaption>
+    </figure>`;
+  }
+
+  const sw = (ent.switches && ent.switches.length) ? `
+    <h3 class="sec">线程切换点</h3>
+    <div class="tablewrap"><table>
+      <thead><tr><th>步骤</th><th>切换</th><th>触发方式</th><th>为什么</th></tr></thead>
+      <tbody>${ent.switches.map(s => `
+        <tr>
+          <td class="num">${s.n}</td>
+          <td class="thr">${esc(s.lane)}</td>
+          <td class="blk"><span class="mono">${esc(s.how)}</span></td>
+          <td class="blk">${esc(s.why)}</td>
+        </tr>`).join('')}</tbody>
+    </table></div>` : '';
+
+  const refs = ent.refs && ent.refs.length ? `
+    <h3 class="sec">关键代码</h3>
+    <ul class="refs">${ent.refs.map(r => `<li><b>${esc(r[0])}</b> — ${esc(r[1])}</li>`).join('')}</ul>` : '';
+
+  const notes = ent.notes && ent.notes.length ? `
+    <h3 class="sec">读图要点</h3>
+    <ul class="notes">${ent.notes.map(n => `<li>${n}</li>`).join('')}</ul>` : '';
+
+  return `
+    <header class="req">
+      <div class="crumb">${esc(crumb)}</div>
+      <h2>${head}${esc(ent.title)}</h2>
+      <div class="path">${esc(ent.path)}</div>
+      <p class="desc">${esc(ent.desc)}</p>
+    </header>
+    ${fig}
+    ${sw}${refs}${notes}`;
+}
+
+// ── 索引 ──
+let currentId = null;
+const rendered = new Map();   // id → 已渲染的 HTML 片段，切回时复用
+
+function buildNav(filter) {
+  const f = (filter || '').trim().toLowerCase();
+  const list = document.getElementById('navList');
+  const noRes = document.getElementById('noRes');
+  const frag = [];
+  let shown = 0;
+
+  for (const g of GROUPS) {
+    const items = ALL.filter(e => e.group === g.id);
+    if (!items.length) continue;
+    const matched = !f ? items : items.filter(e =>
+      (e.path + ' ' + e.title + ' ' + (e.method || '') + ' ' +
+       (e.desc || '') + ' ' + (e.lanes || []).join(' ')).toLowerCase().includes(f));
+    if (!matched.length) continue;
+    shown += matched.length;
+    frag.push(`<div class="grp">
+      <button type="button" aria-expanded="true" data-grp="${g.id}">
+        <span class="chev">▾</span><span>${esc(g.title)}</span>
+        <span style="margin-left:auto;font-weight:400;opacity:.6">${matched.length}</span>
+      </button>
+      <ul>` + matched.map(e => `
+        <li><button type="button" data-id="${e.id}" ${e.id === currentId ? 'aria-current="true"' : ''}>
+          <span class="m">${esc(e.method || '·')}</span>
+          <span class="p">${esc(e.title)}</span>
+        </button></li>`).join('') + `</ul>
+    </div>`);
+  }
+  list.innerHTML = frag.join('');
+  noRes.hidden = shown > 0;
+
+  // 分组折叠
+  list.querySelectorAll('.grp > button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const ul = btn.nextElementSibling;
+      const open = ul.hidden;
+      ul.hidden = !open;
+      btn.setAttribute('aria-expanded', String(open));
+      btn.querySelector('.chev').textContent = open ? '▾' : '▸';
+    });
+  });
+  // 选中
+  list.querySelectorAll('button[data-id]').forEach(btn => {
+    btn.addEventListener('click', () => select(btn.dataset.id));
+  });
+}
+
+function select(id) {
+  const ent = ALL.find(e => e.id === id);
+  if (!ent) return;
+  currentId = id;
+  const reader = document.getElementById('reader');
+  if (!rendered.has(id)) rendered.set(id, renderEntry(ent));
+  reader.innerHTML = rendered.get(id);
+  // 缩放开关：宽图默认适配容器，点击切回 1:1
+  const fb = reader.querySelector('.fitbtn');
+  if (fb) {
+    fb.addEventListener('click', () => {
+      const box = fb.closest('figure').querySelector('.diagram-scroll');
+      const on = box.classList.toggle('fit');
+      fb.setAttribute('aria-pressed', String(on));
+      fb.textContent = on ? '适配宽度' : '原始大小';
+    });
+  }
+  // 高亮
+  document.querySelectorAll('#navList button[data-id]').forEach(b => {
+    if (b.dataset.id === id) b.setAttribute('aria-current', 'true');
+    else b.removeAttribute('aria-current');
+  });
+  // 图注里的「选区」没有额外逻辑
+  if (window.matchMedia('(max-width:860px)').matches) {
+    reader.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  } else {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  try { history.replaceState(null, '', '#' + id); } catch(e){}
+}
+
+// 搜索
+let searchTimer = null;
+document.getElementById('q').addEventListener('input', e => {
+  clearTimeout(searchTimer);
+  const v = e.target.value;
+  searchTimer = setTimeout(() => buildNav(v), 90);
+});
+
+// 初始
+buildNav('');
+const fromHash = (location.hash || '').slice(1);
+select(fromHash && ALL.some(e => e.id === fromHash) ? fromHash : 'overview-turn');
+
+// 计数写进副标题
+document.addEventListener('DOMContentLoaded', () => {
+  const sub = document.querySelector('.topbar .sub');
+  if (sub) sub.textContent = `dorm-platform · ${totalCount()} 个接口，每一步标出由哪条线程执行`;
+});
+window.addEventListener('hashchange', () => {
+  const h = (location.hash || '').slice(1);
+  if (h && h !== currentId && ALL.some(e => e.id === h)) select(h);
+});
+</script>
+
+<footer class="pagefoot">
+  <p>本页由 <code>docs/thread-timeline-src/</code> 生成，改源文件后按其中的 README 重新合并。</p>
+  <p>
+    线程归属来自对运行中 JVM 的 <code>jcmd Thread.dump_to_file</code>，不是从配置推断。
+    相关文档：<a href="agent-sse-design.md">SSE 全链路</a> ·
+    <a href="architecture.md">架构</a> ·
+    <a href="design-notes/README.md">设计决策与踩坑</a>
+  </p>
+</footer>

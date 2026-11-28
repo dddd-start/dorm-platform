@@ -164,7 +164,8 @@ docker compose -f deploy/docker-compose.yml up --build
   可以从第 N 条接着收，因此**无需粘性会话**，重启 / 换实例都能续。
 - 两种接入：浏览器走 `POST` + `fetch` 流式读取（可带 `Authorization`）；受限 WebView 走标准 `EventSource`。
 - 模型回调不在请求线程：用**专用虚拟线程**跑 `StreamingChatModel`，回调里显式恢复用户身份 + traceId + 轮次上下文。
-- 完整链路（准入、事件流水线、收口、背压、断线续传）见 [`docs/agent-sse-design.md`](docs/agent-sse-design.md)。
+- 完整链路（准入、事件流水线、收口、背压、断线续传）见 [`docs/agent-sse-design.md`](docs/agent-sse-design.md)；
+  逐接口的线程归属（哪一步在 `VT-REQ` / `VT-GEN` / `VT-MODEL` / `VT-SSE`）见 [`docs/thread-timeline.html`](docs/thread-timeline.html)。
 
 ### 6.2 工具与权限：25 个工具，读写分离
 
@@ -272,5 +273,6 @@ dorm-platform/
 | 拆分过程与模块映射 | [`docs/migration.md`](docs/migration.md) |
 | 验收记录与实测数字 | [`docs/verification.md`](docs/verification.md) · [`docs/verification/report.md`](docs/verification/report.md)（[PDF](docs/verification/report.pdf)，由同一份 md 渲染）· [`docs/parity.md`](docs/parity.md) |
 | 7 张架构 / 时序图 | [`docs/diagrams/`](docs/diagrams) |
+| 49 个接口的逐接口时序图（标明每一步由哪条线程执行） | [`docs/thread-timeline.html`](docs/thread-timeline.html)（源文件见 [`docs/thread-timeline-src/`](docs/thread-timeline-src/README.md)） |
 | LangChain4j 生产化笔记（10 章，外部仓库） | [dddd-start/langchain4j-in-action](https://github.com/dddd-start/langchain4j-in-action) |
 | 截图清单 | [`docs/screenshots/manifest.md`](docs/screenshots/manifest.md) |
